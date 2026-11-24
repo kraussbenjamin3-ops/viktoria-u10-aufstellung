@@ -1,20 +1,21 @@
 {
-  "name": "Viktoria U10 Aufstellungsmanager",
+  "name": "Viktoria Köln U10 Trainer-Cockpit",
   "short_name": "Viktoria U10",
+  "description": "Trainingsplanung und Mannschaftsmanagement Viktoria Köln U10",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#080808",
-  "theme_color": "#d71920",
+  "orientation": "any",
+  "background_color": "#0a0a0c",
+  "theme_color": "#a80012",
   "icons": [
     {
-      "src": "./icon-192.png",
+      "src": "icon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "./icon-512.png",
+      "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }

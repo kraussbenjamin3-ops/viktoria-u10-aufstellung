@@ -43,7 +43,8 @@ html{scroll-behavior:smooth} body{overflow-x:hidden} .app{width:100%;padding:cla
 .phase-controls>button:nth-child(2),.phase-controls>button:nth-child(3){flex:0 0 44px!important;width:44px!important;min-width:44px!important;padding:6px!important}
 .phase-controls>button:nth-child(4){flex:0 1 86px!important;width:auto!important;min-width:0!important;padding:6px 8px!important;white-space:nowrap!important}
 @media(max-width:450px){.phase-controls{gap:4px!important}.phase-controls>button:nth-child(2),.phase-controls>button:nth-child(3){flex-basis:38px!important;width:38px!important;min-width:38px!important}.phase-controls>button:nth-child(4){flex-basis:76px!important}}
-</style></head><body><div class="app">
+</style><link rel="manifest" href="manifest.json"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><meta name="theme-color" content="#a80012">
+</head><body><div class="app">
 <header class="hero"><h1>VIKTORIA KÖLN <span style="color:#ff253e">V</span></h1><p>U10 · TRAINER-COCKPIT · Saison 2026/27</p><div class="row" style="margin-top:14px"><div><span class="pill red" id="todayLabel"></span></div><div style="text-align:right"><span class="pill">Testversion · lokale Speicherung</span></div></div></header>
 <nav class="nav" id="nav"></nav><main>
 <section id="dashboard" class="section active"></section>
@@ -376,4 +377,6 @@ nav();el('todayLabel').textContent=today.toLocaleDateString('de-DE',{weekday:'lo
  window.alert=function(message){box.textContent=String(message??'');box.classList.add('show');clearTimeout(window.__appToastTimer);window.__appToastTimer=setTimeout(()=>box.classList.remove('show'),3800)};
 })();
 
-</script></body></html>
+</script>
+<script>if('serviceWorker' in navigator && location.protocol.startsWith('http')){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}</script>
+</body></html>
