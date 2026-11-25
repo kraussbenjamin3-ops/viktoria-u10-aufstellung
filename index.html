@@ -435,38 +435,37 @@ function weekPdfExport(k){
  try{
   if(!window.jspdf?.jsPDF){alert('PDF-Bibliothek konnte nicht geladen werden.');return;}
   const doc=new window.jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4'}),W=297,H=210;
-  const w=state.weekPlans[k]||{}, days=['Montag','Dienstag','Donnerstag'];
-  const ds=weekDateRange(k), sess=state.sessions.filter(s=>s.date&&ds.includes(s.date));
-  const daySession=(day)=>sess.find(x=>(x.name||'').toLowerCase().includes(day.toLowerCase()))||sess.find(x=>{let d=new Date(x.date+'T12:00:00').getDay();return day==='Montag'?d===1:day==='Dienstag'?d===2:d===4});
-  const clean=v=>String(v??'').replace(/\s+/g,' ').trim();
-  const lines=v=>String(v||'').split(/\r?\n/).map(a=>a.trim().replace(/^[-•*\s]+/,'')).filter(Boolean);
-  function bg(page){doc.addPage('a4','landscape');doc.addImage(WEEKPDF_BG[page-1],'JPEG',0,0,W,H);}
-  function fit(v,x,y,width,size=8,maxLines=3,color=[255,255,255],bold=false){v=clean(v);if(!v)return;doc.setFont('helvetica',bold?'bold':'normal');doc.setFontSize(size);doc.setTextColor(...color);let a=doc.splitTextToSize(v,width).slice(0,maxLines);if(a.length)doc.text(a,x,y);}
-  function bullet(v,x,y,width,size=7,maxLines=5){let yy=y;lines(v).slice(0,maxLines).forEach(t=>{doc.setFont('helvetica','normal');doc.setFontSize(size);doc.setTextColor(255,255,255);let a=doc.splitTextToSize('• '+t,width).slice(0,2);doc.text(a,x,yy);yy+=a.length*3.7+1;});}
-  // Pages 1-4 are rasterized unchanged from the blank original template.
+  const w=state.weekPlans[k]||{},ds=weekDateRange(k),sessions=state.sessions.filter(s=>s.date&&ds.includes(s.date)).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.time||'').localeCompare(b.time||'')).slice(0,3);
+  const clean=v=>String(v??'').replace(/\u00a0/g,' ').trim();
+  const txtLines=v=>String(v||'').split(/\r?\n/).map(x=>x.trim().replace(/^[-•*▪▫□■☐☑✓✔️\s]+/, '')).filter(Boolean);
+  function addBg(page){doc.addPage('a4','landscape');doc.addImage(WEEKPDF_BG[page-1],'JPEG',0,0,W,H);}
+  function textFit(v,x,y,width,height,opts={}){v=clean(v);if(!v)return;const {size=8,min=5,bold=false,color=[255,255,255],align='left'}=opts;let fs=size,lines;doc.setFont('helvetica',bold?'bold':'normal');while(fs>=min){doc.setFontSize(fs);lines=doc.splitTextToSize(v,width);if(lines.length*fs*.42<=height)break;fs-=.3;}if(fs<min)return;doc.setTextColor(...color);doc.setFontSize(fs);doc.text(lines,x,y,{align});}
+  function boxText(v,x,y,width,height,opts={}){let arr=txtLines(v);if(!arr.length)return;let fs=opts.size||7,yy=y;doc.setFont('helvetica',opts.bold?'bold':'normal');doc.setFontSize(fs);doc.setTextColor(...(opts.color||[255,255,255]));for(const line of arr){let wrapped=doc.splitTextToSize(line,width);let lineH=fs*.43;if(yy+wrapped.length*lineH>y+height)break;doc.text(wrapped,x,yy);yy+=wrapped.length*lineH+1.2;}}
+  function addImg(src,x,y,width,height){if(!src)return;try{let type=String(src).startsWith('data:image/png')?'PNG':'JPEG';let props=doc.getImageProperties(src),scale=Math.min(width/props.width,height/props.height),dw=props.width*scale,dh=props.height*scale;doc.addImage(src,type,x+(width-dw)/2,y+(height-dh)/2,dw,dh);}catch(err){console.warn('Übungsbild konnte nicht eingebettet werden',err);}}
+  function bullets(v,x,y,width,height,size=7){let arr=txtLines(v);if(!arr.length)return;doc.setFont('helvetica','normal');doc.setFontSize(size);doc.setTextColor(255,255,255);let yy=y;for(const line of arr){let wr=doc.splitTextToSize('• '+line,width),lh=size*.44;if(yy+wr.length*lh>y+height)break;doc.text(wr,x,yy);yy+=wr.length*lh+1;}}
+  // Pages 1-4: copy the template backgrounds without any overlays.
   for(let i=1;i<=4;i++){doc.addImage(WEEKPDF_BG[i-1],'JPEG',0,0,W,H);if(i<4)doc.addPage('a4','landscape');}
-  // page 5 week principles page
-  bg(5); fit(k,20,24,70,11,2,[255,255,255],true);fit(w.goal||w.theme||w.tactic||'',20,30,80,10,2,[255,255,255],true);
-  fit(w.oberprinzip,140,23,44,8,3,[255,255,255],true);fit(w.gegenprinzip,230,23,44,8,3,[255,255,255],true);
-  bullet(w.oberUnterprinzipien,138,43,53,6.5,6);bullet(w.gegenUnterprinzipien,228,43,53,6.5,6);
-  fit('KW '+String(k).replace(/^.*?(KW\d+)/,'$1'),22,137,90,9,2,[255,255,255],true);
-  fit(w.classification||'',22,145,90,8,2,[255,255,255]);
-  bullet(w.individualPrinzipien,140,137,43,6,5);bullet(w.gruppenPrinzipien,190,137,43,6,5);bullet(w.mannschaftPrinzipien,240,137,43,6,5);
-  // page 6: overview first week only (template: page 6)
-  bg(6);fit(w.goal||w.theme||w.tactic||'',70,17,60,9,2,[255,255,255],true);fit((w.talentIds||w.talent||[]).map(x=>playerById(x)?.name||x).join(', '),218,17,45,8,2,[255,255,255],true);
-  days.forEach((day,i)=>{let s=daySession(day);fit(s?.name||day,235,17,50,8,2,[255,255,255],true);});
-  const sessions=days.map(daySession);
-  // pages 7-10 first session, 11-14 second, 15-18 third (phase pages); pages 6,11,16 are overview in the requested pagination, handled below
-  function phasePage(pageNum,session,phaseIndex){bg(pageNum);let p=session?.phases?.[phaseIndex];if(!p)return;let ex=(p.exerciseIds||[]).map(id=>state.exercises.find(e=>e.id===id)||p.exerciseSnapshots?.[id]).filter(Boolean);let e=ex[0];
-    fit(session?.name||'',70,17,60,8,2,[255,255,255],true);fit(session?.players?.length?session.players.map(x=>playerById(x)?.name||x).join(', '):'',220,17,50,7,2,[255,255,255]);
-    fit(p.name||p.title||'',18,46,90,9,3,[255,255,255],true);fit(p.focus||p.principle||'',18,54,90,8,3,[255,255,255],true);
-    if(e){fit(e.name,20,67,90,8,3,[255,255,255],true);fit(e.description||e.setup||e.execution||'',20,76,90,7,7,[255,255,255]);bullet(e.variations||e.variants||'',20,100,90,6,5);bullet(e.coachingOff||e.coachingpointsOff||e.coachingPointsOff||'',220,45,67,7,7);bullet(e.coachingDef||e.coachingpointsDef||e.coachingPointsDef||'',220,120,67,7,7);}
+  // Page 5: weekly principles
+  addBg(5);textFit(k,20,24,70,12,{size:11,bold:true});textFit(w.goal||w.theme||w.classification||'',20,31,82,15,{size:9,bold:true});
+  textFit(w.oberprinzip,137,23,55,20,{size:8,bold:true});textFit(w.gegenprinzip,228,23,55,20,{size:8,bold:true});
+  bullets(w.oberUnterprinzipien,137,43,54,50,6.5);bullets(w.gegenUnterprinzipien,228,43,54,50,6.5);
+  textFit(k,20,137,85,14,{size:10,bold:true});textFit(w.classification||'',20,147,85,12,{size:8});
+  bullets(w.individualPrinzipien,136,137,43,45,6);bullets(w.gruppenPrinzipien,185,137,43,45,6);bullets(w.mannschaftPrinzipien,235,137,43,45,6);
+  function phaseOf(s,i){return s?.phases?.[i]||null}
+  function exercisesOf(s,p){return (p?.exerciseIds||[]).map(id=>state.exercises.find(e=>String(e.id)===String(id))||p.exerciseSnapshots?.[id]).filter(Boolean)}
+  function coachingNames(p){let a=Object.entries(p?.coachingAssignments||{}).filter(([,v])=>v).map(([role,name])=>role+': '+name);return a.join('\n')}
+  function overviewPage(page,s){addBg(page);textFit(w.goal||w.theme||w.classification||'',68,17,60,13,{size:9,bold:true});textFit((w.talentIds||[]).map(x=>playerById(x)?.name||x).join(', '),218,17,46,14,{size:7.5,bold:true});
+   for(let i=0;i<4;i++){let p=phaseOf(s,i),x=14+i*70;let phaseTitle=p?.name||('Phase '+(i+1));let principle=p?.principles||p?.focus||p?.description||'';textFit(phaseTitle,x+27,43,38,12,{size:7,bold:true});textFit(principle,x+8,68,54,16,{size:6.2});boxText(coachingNames(p),x+8,111,54,16,{size:5.8});let ex=exercisesOf(s,p)[0];textFit(ex?.name||'',x+8,151,54,14,{size:6.5,bold:true});textFit((ex?.players||'')+' Spieler',x+8,167,54,10,{size:6});textFit(ex?.intensity||'',x+8,181,54,10,{size:6});}
+   textFit(s?.name||'Training',18,17,50,13,{size:8,bold:true});textFit(s?.date?dateStr(s.date):'',18,28,50,10,{size:7});
   }
-  // 3 sessions x overview page and 4 phases. Pages 6,11,16 overview; phase pages 7-10,12-15,17-20.
-  for(let t=0;t<3;t++){if(t>0)bg(6+5*t);let s=sessions[t];if(t>0){fit(s?.name||days[t]||'',18,17,80,9,2,[255,255,255],true);}
-    for(let ph=0;ph<4;ph++)phasePage(7+5*t+ph,s,ph);
+  function detailPage(page,s,pi){addBg(page);let p=phaseOf(s,pi),exercises=exercisesOf(s,p),e=exercises[0];textFit(s?.name||'Training',70,17,65,13,{size:8,bold:true});textFit(s?.players?.length?s.players.map(x=>playerById(x)?.name||x).join(', '):'',220,17,50,12,{size:7});
+   if(p){textFit((p.name||'Phase '+(pi+1))+' · '+(p.duration||0)+' Min',18,42,70,12,{size:8,bold:true});boxText(p.description||'',18,48,68,55,{size:6.5});boxText(p.principles||'',18,48,68,55,{size:6.5});}
+   if(e){textFit(e.name,18,45,70,13,{size:7.5,bold:true});boxText(e.description||e.setup||e.execution||'',18,55,68,53,{size:6.5});boxText(e.variants||e.variations||'',18,121,68,52,{size:6.3});addImg((e.images||[])[0],91,52,115,112);bullets(e.coachingOff||e.coaching||'',222,45,66,62,6.5);bullets(e.coachingDef||'',222,120,66,60,6.5);}
+   else {textFit('Keine Übung in dieser Phase',95,105,110,20,{size:9,bold:true});}
   }
-  // exclude page 21 as requested
+  // Training 1 pages 6-10, Training 2 pages 11-15, Training 3 pages 16-20.
+  for(let t=0;t<3;t++){let s0=sessions[t];overviewPage(6+5*t,s0);for(let ph=0;ph<4;ph++)detailPage(7+5*t+ph,s0,ph);}
+  // Page 21 intentionally omitted.
   doc.save('Wochenplanung_'+k+'_Vorlage.pdf');
  }catch(e){console.error(e);alert('PDF-Export fehlgeschlagen: '+e.message)}
 }
