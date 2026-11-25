@@ -403,6 +403,7 @@ const WEEKPDF_BG=["data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAcFBQ
 function weekPdfEsc(v){return String(v||'').replace(/[\\]/g,'\\\\').replace(/[\r\n]+/g,' ').trim()}
 function weekPdfWrap(doc, text, x,y,w, maxLines=8, size=9){doc.setFont('helvetica','normal');doc.setFontSize(size);let lines=doc.splitTextToSize(String(text||'—'),w);lines=lines.slice(0,maxLines);doc.text(lines,x,y);return y+lines.length*(size*.38)+2;}
 function weekPdfAddBg(doc, page){doc.addImage(WEEKPDF_BG[page-1],'PNG',0,0,297,210);}
+
 function weekPdfExport(k){
  try{
   if(!window.jspdf?.jsPDF){alert('PDF-Bibliothek konnte nicht geladen werden.');return;}
