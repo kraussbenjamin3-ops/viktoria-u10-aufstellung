@@ -414,77 +414,33 @@ function weekPdfExport(k){
  try{
   if(!window.jspdf?.jsPDF){alert('PDF-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen.');return;}
   const doc=new window.jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-  const W=297,H=210, red=[220,20,45], dark=[18,18,22], panel=[30,30,36], grey=[165,165,175], white=[245,245,248];
-  const w=state.weekPlans[k]||{}, days=['Montag','Dienstag','Donnerstag'];
-  const ds=weekDateRange(k), sess=state.sessions.filter(s=>s.date&&ds.includes(s.date));
+  const W=297,H=210,red=[220,20,45],dark=[18,18,22],panel=[30,30,36],grey=[165,165,175],white=[245,245,248];
+  const w=state.weekPlans[k]||{},days=['Montag','Dienstag','Donnerstag'],ds=weekDateRange(k),sess=state.sessions.filter(s=>s.date&&ds.includes(s.date));
   const getDaySession=day=>sess.find(x=>(x.name||'').toLowerCase().includes(day.toLowerCase()))||sess.find(x=>{let d=new Date(x.date+'T12:00:00').getDay();return day==='Montag'?d===1:day==='Dienstag'?d===2:d===4});
-  const txt=v=>String(v??'').replace(/\s+/g,' ').trim();
-  const splitLines=v=>String(v||'').split(/\r?\n/).map(a=>a.trim().replace(/^[-•*]\s*/, '')).filter(Boolean);
-  function base(title,sub=''){
-    doc.setFillColor(...dark);doc.rect(0,0,W,H,'F');
-    doc.setFillColor(...red);doc.rect(0,0,5,H,'F');
-    doc.setFillColor(38,38,45);doc.rect(8,8,W-16,26,'F');
-    doc.setTextColor(...red);doc.setFont('helvetica','bold');doc.setFontSize(9);doc.text('VIKTORIA KÖLN  ·  U10',15,16);
-    doc.setTextColor(...white);doc.setFontSize(19);doc.text(title,15,27);
-    if(sub){doc.setTextColor(...grey);doc.setFont('helvetica','normal');doc.setFontSize(9);doc.text(sub, W-15,16,{align:'right'});}
-    doc.setDrawColor(...red);doc.setLineWidth(.5);doc.line(12,38,W-12,38);
-    doc.setTextColor(...grey);doc.setFontSize(8);doc.text('WOCHENPLAN  ·  '+k,15,H-8);
-    doc.setTextColor(...red);doc.text('V',W-15,H-8,{align:'right'});
-  }
+  const txt=v=>String(v??'').replace(/\s+/g,' ').trim(),splitLines=v=>String(v||'').split(/\r?\n/).map(a=>a.trim().replace(/^[-•*]\s*/,'')).filter(Boolean);
+  function base(title,sub=''){doc.setFillColor(...dark);doc.rect(0,0,W,H,'F');doc.setFillColor(...red);doc.rect(0,0,5,H,'F');doc.setFillColor(38,38,45);doc.rect(8,8,W-16,26,'F');doc.setTextColor(...red);doc.setFont('helvetica','bold');doc.setFontSize(9);doc.text('VIKTORIA KÖLN · U10',15,16);doc.setTextColor(...white);doc.setFontSize(19);doc.text(title,15,27);if(sub){doc.setTextColor(...grey);doc.setFont('helvetica','normal');doc.setFontSize(9);doc.text(txt(sub),W-15,16,{align:'right'});}doc.setDrawColor(...red);doc.setLineWidth(.5);doc.line(12,38,W-12,38);doc.setTextColor(...grey);doc.setFontSize(8);doc.text('WOCHENPLAN · '+k,15,H-8);doc.setTextColor(...red);doc.text('V',W-15,H-8,{align:'right'});}
   function card(x,y,ww,hh,label){doc.setFillColor(...panel);doc.roundedRect(x,y,ww,hh,3,3,'F');if(label){doc.setTextColor(...red);doc.setFont('helvetica','bold');doc.setFontSize(9);doc.text(label,x+5,y+7);}}
-  function write(v,x,y,ww,size=10,color=white,maxH=60,bold=false){v=txt(v)||'—';doc.setTextColor(...color);doc.setFont('helvetica',bold?'bold':'normal');doc.setFontSize(size);let ls=doc.splitTextToSize(v,ww);let max=Math.max(1,Math.floor(maxH/(size*.42)));ls=ls.slice(0,max);doc.text(ls,x,y);return y+ls.length*(size*.42)+2;}
-  function list(v,x,y,ww,size=9,color=white,maxH=50){let arr=splitLines(v);if(!arr.length)arr=['—'];let cur=y;for(let a of arr){cur=write('• '+a,x,cur,ww,size,color,maxH-(cur-y));if(cur-y>maxH)break;}return cur;}
-  function addExerciseThumb(e,x,y,w,h){
-    const imgs=e?.images||[];if(!imgs.length)return false;
-    try{const src=imgs[0];if(!src||!/^data:image\/(png|jpeg|jpg|webp);/i.test(src))return false;doc.addImage(src,undefined,x,y,w,h,'','FAST');return true;}catch(err){console.warn('Übungsbild konnte nicht eingefügt werden',err);return false;}
+  function write(v,x,y,ww,size=10,color=white,maxH=60,bold=false){v=txt(v)||'—';doc.setTextColor(...color);doc.setFont('helvetica',bold?'bold':'normal');doc.setFontSize(size);let ls=doc.splitTextToSize(v,ww),max=Math.max(1,Math.floor(maxH/(size*.42)));ls=ls.slice(0,max);doc.text(ls,x,y);return y+ls.length*(size*.42)+2;}
+  function list(v,x,y,ww,size=9,color=white,maxH=50){let arr=splitLines(v);if(!arr.length)arr=['—'];let cur=y;for(let a of arr){if(cur-y>maxH)break;cur=write('• '+a,x,cur,ww,size,color,maxH-(cur-y));}return cur;}
+  function exFor(p){return (p?.exerciseIds||[]).map(id=>state.exercises.find(a=>a.id===id)||p?.exerciseSnapshots?.[id]).filter(Boolean);}
+  function coachText(p){let a=p?.coachingAssignments||{};return Object.entries(a).filter(([r,n])=>n).map(([r,n])=>r+': '+n).join('\n')||'—';}
+  function principles(p){return Array.isArray(p?.principles)?p.principles.join('\n'):p?.principles||'';}
+  function addImg(src,x,y,ww,hh){try{if(src&&/^data:image\/(png|jpeg|jpg|webp);/i.test(src)){doc.addImage(src,undefined,x,y,ww,hh,'','FAST');return true;}}catch(e){console.warn('PDF image error',e);}return false;}
+  function overviewPage(day,s){doc.addPage('a4','landscape');base('TRAINING · '+day.toUpperCase(),s?.date||'');card(13,45,62,24,'BAUSTEIN TECHNIK');write(s?.techBlock||s?.technicalBlock||s?.technik||w.techBlock||'—',18,57,52,10,white,12,true);card(80,45,62,24,'BAUSTEIN TAKTIK');write(s?.tacticBlock||s?.tacticalBlock||s?.taktik||w.tacticBlock||'—',85,57,52,10,white,12,true);card(147,45,137,24,'WOCHENZIEL');write(w.goal||w.tactic||w.theme||'—',152,57,127,10,white,12,true);card(13,73,62,24,'SPIELER');write(s?.playerCount||s?.playersCount||s?.participants||'—',18,85,52,11,white,12,true);
+    let phases=s?.phases||[],cols=4,gap=4,bw=(271-gap*(cols-1))/cols;phases.slice(0,4).forEach((p,i)=>{let x=13+i*(bw+gap);card(x,101,bw,90,'PHASE '+(i+1));let yy=113;yy=write(p?.name||p?.title||'Phase '+(i+1),x+4,yy,bw-8,10,white,15,true);yy=write('Intensität: '+(p?.intensity||p?.intensitaet||p?.load||'—'),x+4,yy,bw-8,8,grey,10);yy=list('Prinzipien\n'+principles(p),x+4,yy,bw-8,7,white,24);yy=list('Coaching\n'+coachText(p),x+4,yy,bw-8,7,grey,28);});}
+  function detailPage(day,phase,pi,s,ti){doc.addPage('a4','landscape');base('TRAINING '+ti+' · PHASE '+pi,(s?.date||day));let ex=exFor(phase),e=ex[0]||{},snap=phase?.exerciseSnapshots||{};let title=e.name||phase?.name||'Übung';card(13,45,271,16,'ÜBUNG');write(title,18,57,260,14,white,14,true);card(13,65,130,125,'ÜBUNGSBILD');if(e.images?.length)addImg(e.images[0],18,76,120,105);else doc.setTextColor(...grey),doc.text('Kein Übungsbild hinterlegt',20,90);card(148,65,136,40,'ABLAUF');write(e.description||e.setup||e.execution||phase?.description||'—',153,77,126,9,white,28);card(148,108,136,36,'COACHINGPUNKTE OFF');list(e.coachingOff||e.coaching||'—',153,120,126,8,white,23);card(148,147,136,36,'COACHINGPUNKTE DEF.');list(e.coachingDef||'—',153,159,126,8,white,23);
+    doc.setTextColor(...red);doc.setFont('helvetica','bold');doc.setFontSize(8);doc.text('VARIANTEN',18,188);doc.setTextColor(...white);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.text(doc.splitTextToSize(txt(e.variants||e.variant||'—'),260).slice(0,2),18,193);
+    doc.setTextColor(...grey);doc.setFontSize(8);doc.text('Spieler: '+txt(e.players||e.playerCount||phase?.players||'—')+'   ·   Dauer: '+txt(e.duration||phase?.duration||'—')+' min',148,188);
   }
-  function phaseBlock(day,phaseIndex,phase,session,x,y,w,h){
-    doc.setFillColor(...panel);doc.roundedRect(x,y,w,h,2,2,'F');
-    doc.setTextColor(...red);doc.setFont('helvetica','bold');doc.setFontSize(9);doc.text('PHASE '+(phaseIndex+1),x+4,y+6);
-    let title=phase?.name||phase?.title||'Phase '+(phaseIndex+1);doc.setTextColor(...white);doc.setFontSize(11);let titleLines=doc.splitTextToSize(txt(title),w-8).slice(0,2);doc.text(titleLines,x+4,y+12);
-    let ids=phase?.exerciseIds||[], ex=ids.map(id=>state.exercises.find(a=>a.id===id)||phase?.exerciseSnapshots?.[id]).filter(Boolean);
-    let yy=y+12+titleLines.length*4.8+2;
-    if(ex.length){ex.slice(0,3).forEach(e=>{
-      const imgW=Math.min(35,w*.25), imgH=25, tx=x+4+(e.images?.length?imgW+4:0), tw=w-(tx-x)-4;
-      if(e.images?.length)addExerciseThumb(e,x+4,yy,imgW,imgH);
-      doc.setTextColor(...white);doc.setFont('helvetica','bold');doc.setFontSize(8);let nm=doc.splitTextToSize(txt(e.name||'Übung'),tw).slice(0,2);doc.text(nm,tx,yy+4);
-      let desc=txt(e.description||e.setup||e.execution||'');doc.setFont('helvetica','normal');doc.setTextColor(...grey);doc.setFontSize(7);let dl=doc.splitTextToSize(desc,tw).slice(0,3);doc.text(dl,tx,yy+8+nm.length*3.6);
-      yy+=Math.max(imgH,12+nm.length*3.6+dl.length*3.2)+3;
-    });}else{doc.setTextColor(...grey);doc.setFontSize(8);doc.text(doc.splitTextToSize(txt(phase?.description||phase?.setup||'—'),w-8).slice(0,5),x+4,yy);}
-    doc.setTextColor(...red);doc.setFont('helvetica','bold');doc.setFontSize(7);doc.text('SPIELER',x+4,y+h-12);
-    doc.setTextColor(...white);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.text(doc.splitTextToSize(txt(phase?.players||phase?.playerCount||phase?.participants||ex.map(e=>e.players||e.playerCount).filter(Boolean).join(' · ')||'—'),w-8).slice(0,2),x+4,y+h-7);
-  }
-  function dayPage(day,session,phases,groupStart){base(day.toUpperCase(),session?.date||'');
-    const top=45, gap=5, blockW=(271-gap)/2, blockH=72;
-    phases.forEach((p,i)=>{let col=i%2,row=Math.floor(i/2);phaseBlock(day,groupStart+i,p,session,13+col*(blockW+gap),top+row*(blockH+gap),blockW,blockH);});
-  }
-  // 1 cover
-  base('TRAININGSWOCHE', '');doc.setFillColor(...red);doc.rect(13,50,271,5,'F');
-  doc.setTextColor(...white);doc.setFont('helvetica','bold');doc.setFontSize(40);doc.text(k.replace(/.*?(KW\d+)/,'$1'),18,94);
-  doc.setFontSize(20);doc.text(txt(w.goal||w.tactic||w.theme||'WOCHENPLAN'),18,115);
-  doc.setTextColor(...grey);doc.setFont('helvetica','normal');doc.setFontSize(12);doc.text(txt(w.classification||'Offensiv / Defensiv'),18,135);
-  doc.setFillColor(...panel);doc.roundedRect(18,150,255,30,4,4,'F');doc.setTextColor(...red);doc.setFont('helvetica','bold');doc.setFontSize(13);doc.text('VIKTORIA KÖLN  ·  NLZ U10',25,169);
-  // Die bisherigen Grundlagen-Seiten 2-4 wurden entfernt.
-  // page 5 week principles
-  doc.addPage('a4','landscape');base('WOCHENPRINZIPIEN',w.classification||'');
-  card(13,45,271,20,'THEMA');write(w.goal||w.tactic||w.theme||'—',18,57,260,12,white,12,true);
-  card(13,69,132,56,'OBERPRINZIP');write(w.oberprinzip,18,82,122,11,white,25,true);list(w.oberUnterprinzipien,18,96,122,8,grey,24);
-  card(152,69,132,56,'GEGENPRINZIP');write(w.gegenprinzip,157,82,122,11,white,25,true);list(w.gegenUnterprinzipien,157,96,122,8,grey,24);
-  [['INDIVIDUAL',w.individualPrinzipien,13],['GRUPPE',w.gruppenPrinzipien,105],['MANNSCHAFT',w.mannschaftPrinzipien,197]].forEach(([label,val,x])=>{card(x,132,87,62,label);list(val,x+5,145,77,8,white,45);});
-  // page 6 weekly overview
-  doc.addPage('a4','landscape');base('WOCHENÜBERSICHT',w.classification||'');
-  days.forEach((day,i)=>{let s=getDaySession(day),x=13+i*91;card(x,48,84,143,day.toUpperCase());write(s?.name||day,x+5,60,74,10,white,18,true);write(s?.location||'',x+5,73,74,8,grey,10);let phases=s?.phases||[];let y=88;phases.slice(0,4).forEach((p,j)=>{y=write('PHASE '+(j+1)+': '+(p.name||p.title||''),x+5,y,74,8,white,12,true);let names=(p.exerciseIds||[]).map(id=>(state.exercises.find(e=>e.id===id)||p.exerciseSnapshots?.[id])?.name).filter(Boolean).join(', ');y=write(names,x+5,y,74,7,grey,22);});});
-  // Trainingsseiten kompakt: jeweils bis zu vier Phasen eines Tages auf einer Seite, mit Übungsbildern
-  days.forEach(day=>{let s=getDaySession(day),phases=(s?.phases||[]).slice(0,4);doc.addPage('a4','landscape');dayPage(day,s,phases,0);});
-  // final talent training
-  doc.addPage('a4','landscape');base('TALENTTRAINING');
-  card(13,45,271,24,'SPIELER');let talents=(w.talentIds||w.talent||[]).map(x=>playerById(x)?.name||state.players.find(p=>p.name===x)?.name||x).join(', ');write(talents||'—',18,59,260,12,white,14,true);
-  card(13,74,271,118,'INDIVIDUELLE ÜBUNGEN');write(w.talentFocus||w.talentTrainingFocus||w.talentNotes||'Schwerpunkt noch nicht eingetragen',18,87,260,11,white,22,true);
-  let tExercises=w.talentExercises||w.talentTrainingExercises||[];if(typeof tExercises==='string')tExercises=splitLines(tExercises);if(tExercises.length)list(tExercises.join('\n'),18,110,260,9,white,75);
+  // Seiten 1-4 exakt als eingebettete Referenzseiten (Originalgrafiken)
+  weekPdfAddBg(doc,1);for(let i=1;i<4;i++){doc.addPage('a4','landscape');weekPdfAddBg(doc,i+1);}
+  // Seite 5: Wochenprinzipien
+  doc.addPage('a4','landscape');base('WOCHENPRINZIPIEN',w.classification||'');card(13,45,271,18,'KW · WOCHENZIEL · KAPITÄNE');let caps=[w.captainId,w.captainId2].filter(Boolean).map(id=>playerById(id)?.name||id).join(' · ');write(k+'   |   '+(w.goal||w.tactic||w.theme||'—')+'   |   '+(caps||'—'),18,57,260,10,white,12,true);card(13,67,132,54,'OBERPRINZIP');write(w.oberprinzip,18,79,122,10,white,18,true);list(w.oberUnterprinzipien,18,91,122,8,grey,26);card(152,67,132,54,'GEGENPRINZIP');write(w.gegenprinzip,157,79,122,10,white,18,true);list(w.gegenUnterprinzipien,157,91,122,8,grey,26);[['INDIVIDUAL',w.individualPrinzipien,13],['GRUPPE',w.gruppenPrinzipien,105],['MANNSCHAFT',w.mannschaftPrinzipien,197]].forEach(([label,val,x])=>{card(x,126,87,65,label);list(val,x+5,139,77,8,white,47);});
+  // Seiten 6, 11, 16: Trainingsübersichten; Seiten 7-10, 12-15, 17-20: vier Phasen
+  for(let ti=0;ti<3;ti++){let day=days[ti],s=getDaySession(day);overviewPage(day,s);let phases=s?.phases||[];for(let pi=0;pi<4;pi++)detailPage(day,phases[pi]||{},pi+1,s,ti+1);}
   doc.save('Wochenplanung_'+k+'.pdf');
  }catch(e){console.error(e);alert('PDF-Export fehlgeschlagen: '+e.message)}
 }
-
 function openWeekSession(id){document.querySelectorAll('.edit-modal-backdrop').forEach(b=>b.remove());show('training');editSession(String(id));}
 function viewWeekPlan(k){let w=state.weekPlans[k]||{},lines=v=>{let arr=String(v||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).map(x=>esc(x.replace(/^[\s\-•*▪▫□■☐☑✓✔️]+/,'')));return arr.length?`<div class="item" style="padding:12px 16px;line-height:1.55">${arr.join('<br>')}</div>`:'<p class="muted">—</p>';};let html=`<div class="card span12"><div class="row"><div><h2>Trainingsplanung · ${esc(k)}</h2><div class="sub">${esc(w.classification||'Keine Einordnung')}</div></div><button class="primary" onclick="weekPdfExport('${k}')">PDF exportieren</button><button onclick="this.closest('.edit-modal-backdrop')?.remove();show('dashboard')">← Zurück zum Cockpit</button></div><h2>${esc(w.oberprinzip||'Oberprinzip noch nicht eingetragen')}</h2><h3>Unterprinzipien · Oberprinzip</h3>${lines(w.oberUnterprinzipien)}<h2>Gegenprinzip</h2><h3>${esc(w.gegenprinzip||'—')}</h3><h3>Unterprinzipien · Gegenprinzip</h3>${lines(w.gegenUnterprinzipien)}<hr><h2>Individualprinzipien</h2>${lines(w.individualPrinzipien)}<h2>Gruppenprinzipien</h2>${lines(w.gruppenPrinzipien)}<h2>Mannschaftsprinzipien</h2>${lines(w.mannschaftPrinzipien)}</div>`;let back=document.createElement('div');back.className='edit-modal-backdrop';back.style.zIndex='10000';back.innerHTML=`<div class="edit-modal" style="max-width:900px;width:95%;max-height:95vh;overflow:auto">${html}<button onclick="this.closest('.edit-modal-backdrop').remove()">Schließen</button></div>`;document.body.appendChild(back)}
 function saveWeek(e,k,seasonId){e.preventDefault();let f=new FormData(e.target),old=state.weekPlans[k]||{};state.weekPlans[k]={...old,seasonId,goal:f.get('goal'),classification:f.get('classification'),oberprinzip:f.get('oberprinzip'),oberUnterprinzipien:f.get('oberUnterprinzipien'),gegenprinzip:f.get('gegenprinzip'),gegenUnterprinzipien:f.get('gegenUnterprinzipien'),individualPrinzipien:f.get('individualPrinzipien'),gruppenPrinzipien:f.get('gruppenPrinzipien'),mannschaftPrinzipien:f.get('mannschaftPrinzipien'),tech:f.get('tech'),tactic:f.get('tactic'),phaseId:f.get('phaseId'),captainId:f.get('captainId'),captainId2:f.get('captainId2'),captainTask:f.get('captainTask'),talentIds:f.getAll('talentIds'),talentFocus:f.get('talentFocus'),talentLocation:f.get('talentLocation'),notes:f.get('notes')};state.selectedSeasonWeek=k;save()}
