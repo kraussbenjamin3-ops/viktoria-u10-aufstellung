@@ -193,7 +193,7 @@ function orderedExerciseCategories(cats){let uniq=[...new Set(cats)];return [...
 function exercises(){
 let cats=['Alle Kategorien',...orderedExerciseCategories((state.exercises||[]).map(x=>x.category||'Sonstiges'))];
 let selected=window.exerciseCategoryFilter||'Alle Kategorien';
-let searchTerm=window.exerciseDatabaseSearch||'';
+let searchTerm=typeof window.exerciseDatabaseSearch==='string'?window.exerciseDatabaseSearch:'';
 let filtered=getFilteredExercises(selected,searchTerm);
 let formOpen=!!window.exerciseFormOpen;
 el('exercises').innerHTML=`<div class="grid"><div class="span12"><div class="row" style="align-items:center;justify-content:space-between;flex-wrap:wrap"><div><h2 style="margin:0">Übungsdatenbank</h2><p class="sub">${(state.exercises||[]).length} Übungen gespeichert</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button onclick="openNotionImport()">📥 Notion-Import</button><button class="primary" onclick="toggleExerciseForm()">${formOpen?'✕ Abbrechen':'＋ Übung hinzufügen'}</button></div></div></div>
