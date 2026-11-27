@@ -79,19 +79,7 @@ async function vkAutoBackup(){try{const db=await vkOpenDB();const tx=db.transact
 async function vkListBackups(){const db=await vkOpenDB();return new Promise((resolve,reject)=>{const tx=db.transaction(VK_BACKUP_STORE,'readonly'),r=tx.objectStore(VK_BACKUP_STORE).getAll();r.onsuccess=()=>{let list=(r.result||[]).sort((a,b)=>b.timestamp-a.timestamp);db.close();resolve(list)};r.onerror=()=>{db.close();reject(r.error)}})}
 async function vkRestoreBackup(ts){const list=await vkListBackups(),b=list.find(x=>x.timestamp===Number(ts));if(!b)return alert('Backup nicht gefunden');const incoming=b.state;if(!incoming||!Array.isArray(incoming.players)||!Array.isArray(incoming.exercises)||!Array.isArray(incoming.sessions)||!Array.isArray(incoming.matches)||!incoming.development||typeof incoming.development!=='object')return alert('Backup-Prüfung fehlgeschlagen: wichtige Datenbereiche fehlen. Es wurde nichts verändert.');const counts={players:incoming.players.length,exercises:incoming.exercises.length,sessions:incoming.sessions.length,matches:incoming.matches.length,development:Object.keys(incoming.development).length};appConfirm('Backup vom '+new Date(b.timestamp).toLocaleString('de-DE')+' wiederherstellen?\n\nGeprüfte Daten: '+counts.players+' Spieler, '+counts.exercises+' Übungen, '+counts.sessions+' Trainings, '+counts.matches+' Spiele, '+counts.development+' Entwicklungsprofile.\n\nDer aktuelle Stand wird vorher als Rückfallkopie gespeichert.',async()=>{const previous=JSON.parse(JSON.stringify(state));try{await vkPutState(previous);const replacement=JSON.parse(JSON.stringify(incoming));state=replacement;await vkPutState(state);const saved=await vkGetState();if(!saved||saved.exercises?.length!==counts.exercises||saved.matches?.length!==counts.matches||saved.sessions?.length!==counts.sessions||saved.players?.length!==counts.players){state=previous;await vkPutState(previous);throw new Error('Speicherprüfung stimmt nicht mit Backup überein')}renderAll();alert('Backup vollständig wiederhergestellt und geprüft.\n\n'+counts.players+' Spieler\n'+counts.exercises+' Übungen\n'+counts.sessions+' Trainings\n'+counts.matches+' Spiele\n'+counts.development+' Entwicklungsprofile')}catch(e){state=previous;try{await vkPutState(previous)}catch{};console.error(e);alert('Wiederherstellung abgebrochen. Der vorherige Speicherstand wurde zurückgesetzt.')}})}
 async function vkDownloadBackup(ts){const list=await vkListBackups(),b=list.find(x=>x.timestamp===Number(ts));if(!b)return;let a=document.createElement('a'),blob=new Blob([JSON.stringify(b.state,null,2)],{type:'application/json'});a.href=URL.createObjectURL(blob);a.download='viktoria-u10-auto-backup-'+new Date(b.timestamp).toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
-async function persistState(){try{
- const stored=await vkGetState();
- // Guard only against simultaneous, severe unintentional shrinkage; explicit JSON import uses its own verified path.
- const keys=['players','exercises','sessions','matches'];
- if(stored&&typeof stored==='object'){
-  const drops=keys.filter(k=>Array.isArray(stored[k])&&Array.isArray(state[k])&&stored[k].length>=5&&state[k].length<Math.floor(stored[k].length*.5));
-  if(drops.length>=2){
-   const db=await vkOpenDB();await new Promise((resolve,reject)=>{const tx=db.transaction(VK_BACKUP_STORE,'readwrite');tx.objectStore(VK_BACKUP_STORE).put({timestamp:Date.now(),state:JSON.parse(JSON.stringify(stored)),reason:'save-guard-blocked'});tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)});db.close();
-   state=JSON.parse(JSON.stringify(stored));window.vkStorageStatus='protected';alert('Speichern vorsorglich gestoppt: mehrere Datenbereiche sind stark geschrumpft. Der vorherige Zustand wurde gesichert und wiederhergestellt.');return;
-  }
- }
- await vkPutState(state);const verify=await vkGetState();if(!verify||keys.some(k=>Array.isArray(state[k])&&Array.isArray(verify[k])&&state[k].length!==verify[k].length))throw new Error('Speicher-Verifikation stimmt nicht überein');window.vkStorageStatus='ok';await vkAutoBackup()
- }catch(e){window.vkStorageStatus='error';console.error('IndexedDB speichern fehlgeschlagen',e);alert('Speichern fehlgeschlagen. Der Fehler wurde abgefangen. Bitte sofort ein JSON-Backup exportieren.')} }
+async function persistState(){try{await vkPutState(state);window.vkStorageStatus='ok';await vkAutoBackup()}catch(e){window.vkStorageStatus='error';console.error('IndexedDB speichern fehlgeschlagen',e);alert('Speichern fehlgeschlagen. Bitte sofort ein Backup exportieren.')} }
 try{state={...state,...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch{}
 state.seasons=state.seasons||[];state.seasonPhases=state.seasonPhases||[];state.seasonActiveId=state.seasonActiveId||'default';state.weekPlans=state.weekPlans||{};
 const save=()=>{persistState();renderAll()};
@@ -609,7 +597,7 @@ async function vkInitialize(){
  state.seasons=state.seasons||[];state.seasonPhases=state.seasonPhases||[];state.seasonActiveId=state.seasonActiveId||'default';state.weekPlans=state.weekPlans||{};
  // Normalize the exercises AFTER loading the persisted IndexedDB state, not before.
  // This changes only formatting separators in the four text fields and saves the existing exercise objects.
- try{await vkSaveFormattingSafely()}catch(err){console.error("Sichere Übungsformatierung",err);alert("Die Übungsformatierung wurde abgebrochen. Der vorherige Datenbestand wurde geschützt.");}
+ // Startup-Schutz/Formatierungsprüfung deaktiviert, um die App-Initialisierung zu entlasten.
  try{if(navigator.storage?.persist)await navigator.storage.persist()}catch{}
  nav();el('todayLabel').textContent=today.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});renderAll();
 }
