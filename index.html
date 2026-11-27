@@ -430,9 +430,9 @@ async function weekPdfExportNew(k){
   if(!window.jspdf?.jsPDF){alert('PDF-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen.');return;}
   const doc=new window.jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4'}),W=297,H=210;
   const C={red:[220,20,45],black:[15,15,19],panel:[32,32,38],white:[245,245,248],muted:[175,175,185]};
-  const clean=v=>String(v??'').replace(/%Ï|%\u00cf|%\u2022/g,'●').replace(/(^|\n)(\s*)%(?=\s|$)/g,'$1$2●').replace(/[\u0000-\u001f]/g,' ').trim();
-   const textLines=v=>String(v??'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-   const principles=v=>textLines(v).map(x=>{let bullet=/^\s*(?:%|[•●▪▫◦*\-])/.test(x);x=x.replace(/^\s*(?:%|[•●▪▫◦*\-]+)\s*/, '');return {bullet,text:clean(x)};}).filter(x=>x.text);
+  const clean=v=>String(v??'').replace(/%Ï|%\u00cf|%\u2022/g,'●').replace(/%/g,'●').replace(/[\u0000-\u001f]/g,' ').trim();
+  const textLines=v=>String(v??'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  const principles=v=>textLines(v).map(x=>{let bullet=/^\s*(?:%|[•●▪▫◦*\-])/.test(x);x=x.replace(/^\s*(?:%|[•●▪▫◦*\-]+)\s*/,'');return {bullet,text:clean(x)};}).filter(x=>x.text);
   const bg=n=>{if(WEEKPDF_NEW_BG[n-1])doc.addImage(WEEKPDF_NEW_BG[n-1],'PNG',0,0,W,H);};
   const pageTitle=(title,sub='')=>{if(doc.getNumberOfPages()>=5){try{doc.addImage(WEEKPDF_BG_FROM_PAGE5,'PNG',0,0,W,H);}catch(e){doc.setFillColor(...C.black);doc.rect(0,0,W,H,'F');}}doc.setFillColor(...C.black);doc.rect(0,0,W,22,'F');doc.setTextColor(...C.red);doc.setFont('helvetica','bold');let titleFs=17;while(titleFs>9&&doc.getTextWidth(title)>W-28){titleFs-=.5;doc.setFontSize(titleFs);}doc.text(doc.splitTextToSize(title,W-28).slice(0,1),14,13);doc.setTextColor(...C.white);doc.setFontSize(9);if(sub){let subTxt=doc.splitTextToSize(sub,W-28);doc.text(subTxt.slice(0,1),14,19);}};
   const card=(x,y,w,h,title)=>{doc.setFillColor(...C.panel);doc.roundedRect(x,y,w,h,3,3,'F');doc.setDrawColor(...C.red);doc.setLineWidth(.6);doc.roundedRect(x,y,w,h,3,3,'S');doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(...C.red);doc.text(title,x+4,y+7);};
@@ -452,15 +452,15 @@ async function weekPdfExportNew(k){
   const coachingOrg=s=>{let rows=[];(s.phases||[]).forEach(p=>Object.entries(p.coachingAssignments||{}).forEach(([role,coach])=>{if(coach&&String(coach).trim()&&String(coach).trim()!=='—')rows.push(`${role}: ${coach}`);}));return [...new Set(rows)].join('\n');};
   // Jede Trainingsübersicht unmittelbar vor den Phasendetails dieses Trainings.
   for(let si=0;si<3;si++){
-   let s=sessions[si]||null,ph=s?.phases||[];
+   let s=sessions[si]||null,ph=(s?.phases||[]).filter(p=>p && ((p.exerciseIds||[]).length || p.name || p.description || p.principles || Object.values(p.coachingAssignments||{}).some(Boolean)));
    doc.addPage();pageTitle('TRAININGSÜBERSICHT',s?(s.name||'Training')+' · '+weekday(s):'Training '+(si+1)+' · nicht geplant');
    card(10,27,85,29,'TECHNIK');put(s?.tech||'—',15,40,75,10,14);card(101,27,85,29,'TAKTIK');put(s?.tactic||'—',106,40,75,10,14);card(192,27,95,29,'WOCHENZIEL');put(wk.goal,197,40,85,10,14);
    card(10,61,277,54,'PHASEN · ZEITPLAN');let yy=73;ph.slice(0,6).forEach((p,i)=>{let coach=Object.entries(p.coachingAssignments||{}).filter(([r,c])=>c&&String(c).trim()&&String(c).trim()!=='—').map(([r,c])=>r+': '+c).join(' · ');let line=(i+1)+'. '+clean(p.name)+' · '+(+p.duration||0)+' min'+(coach?' | '+coach:'');put(line,15,yy,265,8.5,10);yy+=10;});if(!ph.length)put('Keine Phasen zugeordnet.',15,75,260,9,20);
    card(10,118,135,78,'PRINZIPIEN');bulletList(sessionPrinciples(s),15,130,125,8,60);
-   card(151,118,136,78,'COACHING · ORGANISATION');put('Coaching siehe jeweilige Phase im Zeitplan.',156,130,126,8,58);
-   for(let pi=0;pi<4;pi++){
-    let p=ph[pi]||null;doc.addPage();let exIds=p?.exerciseIds||[],ex=exIds.map(id=>state.exercises.find(e=>String(e.id)===String(id))||p?.exerciseSnapshots?.[id]).filter(Boolean);pageTitle('PHASENDETAIL',s?(s.name||'Training')+' · '+clean(ex[0]?.name||p?.name||('Phase '+(pi+1))):'Training '+(si+1)+' · Phase '+(pi+1));
-    card(10,27,277,18,'ÜBUNG');put(ex.map(e=>e.name||'').filter(Boolean).join(' · ')||p?.name||'Nicht belegt',15,39,265,9,12);
+   card(151,118,136,78,'COACHING · ORGANISATION');
+   for(let pi=0;pi<ph.length;pi++){
+    let p=ph[pi]||null; if(!p) continue;doc.addPage();let exIds=p?.exerciseIds||[],ex=exIds.map(id=>state.exercises.find(e=>String(e.id)===String(id))||p?.exerciseSnapshots?.[id]).filter(Boolean);pageTitle('PHASENDETAIL',s?(s.name||'Training')+' · '+clean(ex[0]?.name||p?.name||('Phase '+(pi+1))):'Training '+(si+1)+' · Phase '+(pi+1));
+    card(10,27,277,18,'ÜBUNG');put(ex.map(e=>e.name||'').filter(Boolean).join(' · ')||p?.name||'Übung',15,39,265,9,12);
     const exPrinciples=p?.principles||'';
     card(10,49,277,22,'ÜBUNGSPRINZIPIEN');bulletList(principles(exPrinciples),15,61,265,7.5,10);
     const combined=(fields)=>ex.map(e=>{let v=fields.map(f=>e[f]).find(v=>v&&String(v).trim());return v||'';}).filter(Boolean).join('\n\n')||'—';
