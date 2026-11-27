@@ -437,8 +437,8 @@ async function weekPdfExportNew(k){
   const pageTitle=(title,sub='')=>{if(doc.getNumberOfPages()>=5){try{doc.addImage(WEEKPDF_BG_FROM_PAGE5,'PNG',0,0,W,H);}catch(e){doc.setFillColor(...C.black);doc.rect(0,0,W,H,'F');}}doc.setFillColor(...C.black);doc.rect(0,0,W,22,'F');doc.setTextColor(...C.red);doc.setFont('helvetica','bold');let titleFs=17;while(titleFs>9&&doc.getTextWidth(title)>W-28){titleFs-=.5;doc.setFontSize(titleFs);}doc.text(doc.splitTextToSize(title,W-28).slice(0,1),14,13);doc.setTextColor(...C.white);doc.setFontSize(9);if(sub){let subTxt=doc.splitTextToSize(sub,W-28);doc.text(subTxt.slice(0,1),14,19);}};
   const card=(x,y,w,h,title)=>{doc.setFillColor(...C.panel);doc.roundedRect(x,y,w,h,3,3,'F');doc.setDrawColor(...C.red);doc.setLineWidth(.6);doc.roundedRect(x,y,w,h,3,3,'S');doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(...C.red);doc.text(title,x+4,y+7);};
    // Textfelder: feste Schriftgröße pro Feld; Zeilen werden innerhalb der Feldhöhe begrenzt.
-   const put=(v,x,y,w,size=9,maxH=40)=>{v=clean(v)||'—';doc.setFont('helvetica','normal');doc.setTextColor(...C.white);doc.setFontSize(size);const lh=size*.38+1.0;let lines=doc.splitTextToSize(v,w),cap=Math.max(1,Math.floor(maxH/lh));if(lines.length>cap){lines=lines.slice(0,cap);let last=String(lines[cap-1]||'');while(last.length&&doc.getTextWidth(last+'…')>w)last=last.slice(0,-1);lines[cap-1]=last+'…';}doc.saveGraphicsState();doc.rect(x,y-size*.35,w,maxH);doc.clip();doc.text(lines,x,y);doc.restoreGraphicsState();return Math.min(lines.length*lh,maxH);};
-   const bulletList=(arr,x,y,w,size=8,maxH=50)=>{let used=0,lh=size*.38+1.0;doc.setFont('helvetica','normal');doc.setFontSize(size);doc.setTextColor(...C.white);for(const item of arr){const indent=item.bullet?4:0;if(used+lh>maxH)break;let textLines=doc.splitTextToSize(item.text,w-indent),cap=Math.max(1,Math.floor((maxH-used)/lh));if(textLines.length>cap){textLines=textLines.slice(0,cap);let last=String(textLines[cap-1]||'');while(last.length&&doc.getTextWidth(last+'…')>w-indent)last=last.slice(0,-1);textLines[cap-1]=last+'…';}doc.saveGraphicsState();doc.rect(x,y+used-size*.3,w,maxH-used);doc.clip();if(item.bullet){doc.setFillColor(...C.white);doc.circle(x+1.2,y+used+size*.25,0.65,'F');}doc.text(textLines,x+indent,y+used);doc.restoreGraphicsState();used+=textLines.length*lh+1;if(used>=maxH)break;}return used;};
+   const put=(v,x,y,w,size=9,maxH=40)=>{v=clean(v)||'—';doc.setFont('helvetica','normal');doc.setTextColor(...C.white);doc.setFontSize(size);let lines=doc.splitTextToSize(v,w),lh=size*.38+1.0,cap=Math.max(1,Math.floor(maxH/lh));if(lines.length>cap){lines=lines.slice(0,cap);let last=lines[cap-1]||'';while(last.length&&doc.getTextWidth(last+'…')>w)last=last.slice(0,-1);lines[cap-1]=last+'…';}doc.text(lines,x,y,{maxWidth:w});return Math.min(lines.length*lh,maxH);};
+   const bulletList=(arr,x,y,w,size=8,maxH=50)=>{let used=0,lh=size*.38+1.0;doc.setFont('helvetica','normal');doc.setFontSize(size);doc.setTextColor(...C.white);for(const item of arr){if(used+lh>maxH)break;let textLines=doc.splitTextToSize(item.text,w-4),cap=Math.max(1,Math.floor((maxH-used)/lh));if(textLines.length>cap){textLines=textLines.slice(0,cap);let last=textLines[cap-1]||'';while(last.length&&doc.getTextWidth(last+'…')>w-4)last=last.slice(0,-1);textLines[cap-1]=last+'…';}doc.setFillColor(...C.white);doc.circle(x+1.2,y+used+size*.25,0.65,'F');doc.text(textLines,x+4,y+used,{maxWidth:w-4});used+=textLines.length*lh+1;if(used>=maxH)break;}return used;};
   bg(1);for(let n=2;n<=4;n++){doc.addPage();bg(n);}
   doc.addPage();bg(5);let wk=state.weekPlans[k]||{};pageTitle('WOCHENPRINZIPIEN',k);
   card(10,28,137,45,'OBERPRINZIP');put(wk.oberprinzip,15,40,127,13,32);
@@ -455,23 +455,22 @@ async function weekPdfExportNew(k){
    let s=sessions[si]||null,ph=s?.phases||[];
    doc.addPage();pageTitle('TRAININGSÜBERSICHT',s?(s.name||'Training')+' · '+weekday(s):'Training '+(si+1)+' · nicht geplant');
    card(10,27,85,29,'TECHNIK');put(s?.tech||'—',15,40,75,10,14);card(101,27,85,29,'TAKTIK');put(s?.tactic||'—',106,40,75,10,14);card(192,27,95,29,'WOCHENZIEL');put(wk.goal,197,40,85,10,14);
-   card(10,61,277,54,'PHASEN · ZEITPLAN');let yy=73;ph.slice(0,6).forEach((p,i)=>{let line=(i+1)+'. '+clean(p.name)+' · '+(+p.duration||0)+' min';put(line,15,yy,265,9,10);yy+=10;let org=coachingOrg(p);if(org&&yy<108){put('Coaching: '+org,18,yy,260,7.5,8);yy+=8;}});if(!ph.length)put('Keine Phasen zugeordnet.',15,75,260,9,20);
+   card(10,61,277,54,'PHASEN · ZEITPLAN');let yy=73;ph.slice(0,6).forEach((p,i)=>{put((i+1)+'. '+clean(p.name)+' · '+(+p.duration||0)+' min',15,yy,265,9,10);yy+=10;let org=coachingOrg(p);if(org&&yy<108){put('Coaching: '+org,18,yy,260,7.5,8);yy+=8;}});if(!ph.length)put('Keine Phasen zugeordnet.',15,75,260,9,20);
    card(10,118,135,78,'PRINZIPIEN');bulletList(sessionPrinciples(s),15,130,125,8,60);
-   card(151,118,136,78,'COACHING · PHASEN');put('Die Zuordnungen stehen direkt bei jeder Phase.',156,130,126,8,48);
+   card(151,118,136,78,'COACHING · ORGANISATION');put('Coaching-Zuordnungen stehen direkt bei jeder Phase.',156,130,126,8,58);
    for(let pi=0;pi<4;pi++){
     let p=ph[pi]||null;doc.addPage();let exIds=p?.exerciseIds||[],ex=exIds.map(id=>state.exercises.find(e=>String(e.id)===String(id))||p?.exerciseSnapshots?.[id]).filter(Boolean);pageTitle('PHASENDETAIL',s?(s.name||'Training')+' · '+clean(ex[0]?.name||p?.name||('Phase '+(pi+1))):'Training '+(si+1)+' · Phase '+(pi+1));
     card(10,27,277,18,'ÜBUNG');put(ex.map(e=>e.name||'').filter(Boolean).join(' · ')||p?.name||'Nicht belegt',15,39,265,9,12);
     const exPrinciples=p?.principles||'';
     card(10,49,277,22,'ÜBUNGSPRINZIPIEN');bulletList(principles(exPrinciples),15,61,265,7.5,10);
-    const phaseOrg=coachingOrg(p);if(phaseOrg){card(10,73,277,16,'COACHING · ORGANISATION');put(phaseOrg,15,84,265,8,8);}
     const combined=(fields)=>ex.map(e=>{let v=fields.map(f=>e[f]).find(v=>v&&String(v).trim());return v||'';}).filter(Boolean).join('\n\n')||'—';
-    card(10,91,77,42,'ABLAUF');put(combined(['description','setup','ablauf']),15,103,67,7.5,30);
+    card(10,75,77,58,'ABLAUF');put(combined(['description','setup','ablauf']),15,87,67,7.5,44);
     card(10,137,77,56,'VARIANTEN');put(combined(['variants','variations']),15,149,67,7.5,42);
-    card(210,91,77,42,'COACHING OFF');put(combined(['coachingOff','coaching','offensiveCoaching']),215,103,67,7.5,30);
+    card(210,75,77,58,'COACHING OFF');put(combined(['coachingOff','coaching','offensiveCoaching']),215,87,67,7.5,44);
     card(210,137,77,56,'COACHING DEF');put(combined(['coachingDef','defensiveCoaching']),215,149,67,7.5,42);
-    card(91,91,114,102,'ÜBUNGSBILD');
+    card(91,75,114,118,'ÜBUNGSBILD');
     let image=ex.flatMap(e=>{let a=e.images||e.image||e.picture||e.imageData||e.photo||[];return Array.isArray(a)?a:[a];}).find(v=>typeof v==='string'&&(v.startsWith('data:image/')||v.startsWith('data:')));
-    if(image){try{let fmt=image.includes('image/jpeg')?'JPEG':image.includes('image/webp')?'WEBP':'PNG',props=doc.getImageProperties(image),ratio=props.width/props.height,boxW=104,boxH=112,w=boxW,h=boxH;if(ratio>boxW/boxH){h=boxW/ratio;}else{w=boxH*ratio;}doc.addImage(image,fmt,96+(boxW-w)/2,103+(boxH-h)/2,w,h,'','FAST');}catch(err){put('Bild konnte nicht eingebettet werden.',96,121,104,8,20);}}else put('Kein gespeichertes Übungsbild',96,121,104,8,20);
+    if(image){try{let fmt=image.includes('image/jpeg')?'JPEG':image.includes('image/webp')?'WEBP':'PNG',props=doc.getImageProperties(image),ratio=props.width/props.height,boxW=104,boxH=112,w=boxW,h=boxH;if(ratio>boxW/boxH){h=boxW/ratio;}else{w=boxH*ratio;}doc.addImage(image,fmt,96+(boxW-w)/2,87+(boxH-h)/2,w,h,'','FAST');}catch(err){put('Bild konnte nicht eingebettet werden.',96,105,104,8,20);}}else put('Kein gespeichertes Übungsbild',96,105,104,8,20);
     doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(...C.white);doc.text((p?.players||'—')+' Spieler · '+(+p?.duration||0)+' min',148,183,{align:'center'});
    }
   }
