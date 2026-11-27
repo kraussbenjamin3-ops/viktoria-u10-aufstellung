@@ -440,41 +440,44 @@ async function weekPdfExportNew(k){
    const put=(v,x,y,w,size=9,maxH=40)=>{v=clean(v)||'—';doc.setFont('helvetica','normal');doc.setTextColor(...C.white);doc.setFontSize(size);let lines=doc.splitTextToSize(v,w),lh=size*.38+1.0,cap=Math.max(1,Math.floor(maxH/lh));if(lines.length>cap){lines=lines.slice(0,cap);let last=lines[cap-1]||'';while(last.length&&doc.getTextWidth(last+'…')>w)last=last.slice(0,-1);lines[cap-1]=last+'…';}doc.text(lines,x,y,{maxWidth:w});return Math.min(lines.length*lh,maxH);};
    const putMarked=(v,x,y,w,size=8,maxH=40)=>{
   const rows=principles(v);if(!rows.length)return 0;
-  const colGap=3, maxCols=2;
-  // Use at most two columns. If content is unusually long, gently reduce the
-  // font size uniformly within this field until it fits its available height.
+  const colGap=3,maxCols=2,baseGap=.65;
   let fs=size,cols=1,actualW=w,lh=fs*.48+1.15;
-  const fits=(n,trialFs)=>{
-    const cw=(w-(n-1)*colGap)/n, lineH=trialFs*.48+1.15;
-    let used=0,curCol=0;
+  const layout=(n,trialFs)=>{
+    const cw=(w-(n-1)*colGap)/n,lineH=trialFs*.48+1.15;
+    let col=0,used=0,items=[];
     for(const row of rows){
-      const indent=row.bullet?4:0,avail=Math.max(8,cw-indent),lines=doc.splitTextToSize(row.text,avail);
+      const indent=row.bullet?4:0,avail=Math.max(8,cw-indent);
+      doc.setFont('helvetica','normal');doc.setFontSize(trialFs);
+      const lines=doc.splitTextToSize(row.text,avail);
       for(let li=0;li<lines.length;li++){
-        if(used+lineH+.65>maxH+.01){curCol++;used=0;}
-        if(curCol>=n)return false;
+        if(used+lineH>maxH+.01){col++;used=0;}
+        if(col>=n)return null;
+        items.push({text:lines[li],col,used,indent,avail,bullet:row.bullet&&li===0});
         used+=lineH;
       }
-      used+=.65;
+      used+=baseGap;
     }
-    return true;
+    return {items,used,col,cw,lineH};
   };
-  if(!fits(1,fs)){cols=2;}
-  while(!fits(cols,fs)&&fs>5.5){fs=Math.max(5.5,fs-.25);}
+  let result=layout(1,fs);
+  if(!result){cols=2;result=layout(cols,fs);}
+  // Shrink in small, uniform steps only if two columns still cannot fit.
+  while(!result&&fs>4.8){fs=Math.max(4.8,fs-.2);result=layout(cols,fs);}
+  if(!result){
+    // Last-resort safe fit: two columns at the minimum font, trimming only
+    // beyond the physical field capacity rather than drawing outside the box.
+    fs=4.8;cols=2;actualW=(w-colGap)/2;lh=fs*.48+1.15;
+    result=layout(cols,fs);
+  }
   actualW=(w-(cols-1)*colGap)/cols;lh=fs*.48+1.15;
   doc.setFont('helvetica','normal');doc.setFontSize(fs);doc.setTextColor(...C.white);
-  let col=0,used=0;
-  for(const row of rows){
-    const indent=row.bullet?4:0,avail=Math.max(8,actualW-indent),lines=doc.splitTextToSize(row.text,avail);
-    for(let li=0;li<lines.length;li++){
-      if(used+lh+.65>maxH+.01){col++;used=0;}
-      if(col>=cols){col=cols-1;used=Math.max(0,maxH-lh);}
-      const cx=x+col*(actualW+colGap),baseline=y+used+fs*.78;
-      if(li===0&&row.bullet){doc.setFillColor(...C.white);doc.circle(cx+1.15,baseline-fs*.12,.65,'F');}
-      doc.text(String(lines[li]),cx+indent,baseline,{maxWidth:avail});used+=lh;
-    }
-    used+=.65;
+  const items=result?.items||[];
+  for(const item of items){
+    const cx=x+item.col*(actualW+colGap),baseline=y+item.used+fs*.78;
+    if(item.bullet){doc.setFillColor(...C.white);doc.circle(cx+1.15,baseline-fs*.12,.65,'F');}
+    doc.text(String(item.text),cx+item.indent,baseline,{maxWidth:item.avail});
   }
-  return Math.min(maxH,used);
+  return Math.min(maxH,result?.used||0);
 };
 const bulletList=(arr,x,y,w,size=8,maxH=50)=>putMarked(arr.map(i=>(i.bullet?'% ':'')+i.text).join('\n'),x,y,w,size,maxH);
   bg(1);for(let n=2;n<=4;n++){doc.addPage();bg(n);}
