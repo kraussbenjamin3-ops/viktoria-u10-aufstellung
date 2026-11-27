@@ -451,7 +451,7 @@ async function weekPdfExportNew(k){
     if(lines.length>cap){lines=lines.slice(0,cap);if(lines.length){let last=String(lines[lines.length-1]);while(last.length&&doc.getTextWidth(last+'…')>avail)last=last.slice(0,-1);lines[lines.length-1]=last+'…';}}
     for(let li=0;li<lines.length;li++){
       const baseline=y+used+size*.78;
-      if(li===0&&row.bullet){doc.setFillColor(...C.white);doc.circle(x+1.15,baseline-size*.30,.65,'F');}
+      if(li===0&&row.bullet){doc.setFillColor(...C.white);doc.circle(x+1.15,baseline-size*.12,.65,'F');}
       doc.text(String(lines[li]),x+indent,baseline,{maxWidth:avail});
       used+=lh;
     }
