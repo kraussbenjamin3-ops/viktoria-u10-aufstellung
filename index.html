@@ -430,9 +430,9 @@ async function weekPdfExportNew(k){
   if(!window.jspdf?.jsPDF){alert('PDF-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen.');return;}
   const doc=new window.jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4'}),W=297,H=210;
   const C={red:[220,20,45],black:[15,15,19],panel:[32,32,38],white:[245,245,248],muted:[175,175,185]};
-  const clean=v=>String(v??'').replace(/%Ï|%\u00cf/g,'•').replace(/[\u0000-\u001f]/g,' ').replace(/\s+/g,' ').trim();
+  const clean=v=>String(v??'').replace(/%Ï|%\u00cf/g,'•').replace(/(^|\n)\s*%(?=\s|$)/g,'$1•').replace(/[\u0000-\u001f]/g,' ').replace(/\s+/g,' ').trim();
   const textLines=v=>String(v??'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-  const principles=v=>textLines(v).map(x=>({bullet:/^[\s]*[•●▪▫◦*\-]/.test(x),text:clean(x.replace(/^[\s]*[•●▪▫◦*\-]+\s*/,''))})).filter(x=>x.text);
+  const principles=v=>textLines(v).map(x=>{x=x.replace(/^\s*%\s*/, '• ');return {bullet:/^[\s]*[•●▪▫◦*\-]/.test(x),text:clean(x.replace(/^[\s]*[•●▪▫◦*\-]+\s*/,''))};}).filter(x=>x.text);
   const bg=n=>{if(WEEKPDF_NEW_BG[n-1])doc.addImage(WEEKPDF_NEW_BG[n-1],'PNG',0,0,W,H);};
   const pageTitle=(title,sub='')=>{if(doc.getNumberOfPages()>=5){try{doc.addImage(WEEKPDF_BG_FROM_PAGE5,'PNG',0,0,W,H);}catch(e){doc.setFillColor(...C.black);doc.rect(0,0,W,H,'F');}}doc.setFillColor(...C.black);doc.rect(0,0,W,22,'F');doc.setTextColor(...C.red);doc.setFont('helvetica','bold');doc.setFontSize(17);doc.text(title,14,13);doc.setTextColor(...C.white);doc.setFontSize(9);if(sub)doc.text(sub,14,19);};
   const card=(x,y,w,h,title)=>{doc.setFillColor(...C.panel);doc.roundedRect(x,y,w,h,3,3,'F');doc.setDrawColor(...C.red);doc.setLineWidth(.6);doc.roundedRect(x,y,w,h,3,3,'S');doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(...C.red);doc.text(title,x+4,y+7);};
@@ -448,7 +448,7 @@ async function weekPdfExportNew(k){
   let weekDays=weekDateRange(k),sessions=state.sessions.filter(s=>s.date&&weekDays.includes(s.date)).sort((a,b)=>a.date.localeCompare(b.date));
   const weekday=s=>{try{return new Date(s.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long'});}catch{return s.date||'Training';}};
   const sessionPrinciples=s=>principles(s.principles||s.trainingPrinciples||s.phasePrinciples||'');
-  const coachingOrg=s=>{let a=s.coachingAssignments||s.coachingOrganisation||s.coachingOrganization||s.coachesByField||{};let entries=Object.entries(a).filter(([r,c])=>c);if(!entries.length){let seen={};(s.phases||[]).forEach(p=>Object.entries(p.coachingAssignments||{}).forEach(([r,c])=>{if(c)seen[r]=seen[r]?(seen[r]+' / '+c):c;}));entries=Object.entries(seen);}if(entries.length)return entries.map(([r,c])=>`${r}: ${c}`).join('\n');if(s.coach)return String(s.coach);return '—';};
+  const coachingOrg=s=>{let a=s.coachingAssignments||s.coachingOrganisation||s.coachingOrganization||s.coachesByField||{};let entries=Object.entries(a).filter(([r,c])=>c!==false&&c!==null&&c!==undefined&&String(c).trim()&&String(c).trim()!=='—');if(!entries.length){let seen={};(s.phases||[]).forEach(p=>Object.entries(p.coachingAssignments||{}).forEach(([r,c])=>{if(c!==false&&c!==null&&c!==undefined&&String(c).trim()&&String(c).trim()!=='—')seen[r]=seen[r]?(seen[r]+' / '+c):c;}));entries=Object.entries(seen);}return entries.length?entries.map(([r,c])=>`${r}: ${c}`).join('\n'):(s.coach?String(s.coach):'—');};
   // Jede Trainingsübersicht unmittelbar vor den Phasendetails dieses Trainings.
   for(let si=0;si<3;si++){
    let s=sessions[si]||null,ph=s?.phases||[];
@@ -461,14 +461,16 @@ async function weekPdfExportNew(k){
     let p=ph[pi]||null;doc.addPage();pageTitle('PHASENDETAIL',s?(s.name||'Training')+' · '+clean(p?.name||('Phase '+(pi+1))):'Training '+(si+1)+' · Phase '+(pi+1));
     card(10,27,277,18,'ÜBUNG');put(p?.name||'Nicht belegt',15,39,265,9,12);
     let exIds=p?.exerciseIds||[],ex=exIds.map(id=>state.exercises.find(e=>String(e.id)===String(id))||p?.exerciseSnapshots?.[id]).filter(Boolean);
+    const exPrinciples=ex.map(e=>e.principles||e.trainingPrinciples||e.phasePrinciples||e.principle||'').filter(Boolean).join('\n');
+    card(10,49,277,22,'ÜBUNGSPRINZIPIEN');bulletList(principles(exPrinciples),15,61,265,7.5,10);
     const combined=(fields)=>ex.map(e=>{let v=fields.map(f=>e[f]).find(v=>v&&String(v).trim());return v||'';}).filter(Boolean).join('\n\n')||'—';
-    card(10,49,77,67,'ABLAUF');put(combined(['description','setup','ablauf']),15,61,67,7.5,53);
-    card(10,121,77,67,'VARIANTEN');put(combined(['variants','variations']),15,133,67,7.5,53);
-    card(210,49,77,67,'COACHING OFF');put(combined(['coachingOff','coaching','offensiveCoaching']),215,61,67,7.5,53);
-    card(210,121,77,67,'COACHING DEF');put(combined(['coachingDef','defensiveCoaching']),215,133,67,7.5,53);
-    card(91,49,114,139,'ÜBUNGSBILD');
-    let image=ex.flatMap(e=>e.images||[]).find(v=>typeof v==='string'&&v.startsWith('data:image/'));
-    if(image){try{let fmt=image.includes('image/jpeg')?'JPEG':image.includes('image/webp')?'WEBP':'PNG',props=doc.getImageProperties(image),ratio=props.width/props.height,boxW=104,boxH=112,w=boxW,h=boxH;if(ratio>boxW/boxH){h=boxW/ratio;}else{w=boxH*ratio;}doc.addImage(image,fmt,96+(boxW-w)/2,61+(boxH-h)/2,w,h,'','FAST');}catch(err){put('Bild konnte nicht eingebettet werden.',96,90,104,8,20);}}else put('Kein gespeichertes Übungsbild',96,90,104,8,20);
+    card(10,75,77,58,'ABLAUF');put(combined(['description','setup','ablauf']),15,87,67,7.5,44);
+    card(10,137,77,56,'VARIANTEN');put(combined(['variants','variations']),15,149,67,7.5,42);
+    card(210,75,77,58,'COACHING OFF');put(combined(['coachingOff','coaching','offensiveCoaching']),215,87,67,7.5,44);
+    card(210,137,77,56,'COACHING DEF');put(combined(['coachingDef','defensiveCoaching']),215,149,67,7.5,42);
+    card(91,75,114,118,'ÜBUNGSBILD');
+    let image=ex.flatMap(e=>{let a=e.images||e.image||e.picture||e.imageData||e.photo||[];return Array.isArray(a)?a:[a];}).find(v=>typeof v==='string'&&(v.startsWith('data:image/')||v.startsWith('data:')));
+    if(image){try{let fmt=image.includes('image/jpeg')?'JPEG':image.includes('image/webp')?'WEBP':'PNG',props=doc.getImageProperties(image),ratio=props.width/props.height,boxW=104,boxH=112,w=boxW,h=boxH;if(ratio>boxW/boxH){h=boxW/ratio;}else{w=boxH*ratio;}doc.addImage(image,fmt,96+(boxW-w)/2,87+(boxH-h)/2,w,h,'','FAST');}catch(err){put('Bild konnte nicht eingebettet werden.',96,105,104,8,20);}}else put('Kein gespeichertes Übungsbild',96,105,104,8,20);
     doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(...C.white);doc.text((p?.players||'—')+' Spieler · '+(+p?.duration||0)+' min',148,183,{align:'center'});
    }
   }
