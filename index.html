@@ -450,7 +450,7 @@ async function weekPdfExportNew(k){
     for(const row of rows){
       const indent=row.bullet?4:0,avail=Math.max(8,cw-indent),lines=doc.splitTextToSize(row.text,avail);
       for(let li=0;li<lines.length;li++){
-        if(used+lineH>maxH+.01){curCol++;used=0;}
+        if(used+lineH+.65>maxH+.01){curCol++;used=0;}
         if(curCol>=n)return false;
         used+=lineH;
       }
@@ -466,7 +466,7 @@ async function weekPdfExportNew(k){
   for(const row of rows){
     const indent=row.bullet?4:0,avail=Math.max(8,actualW-indent),lines=doc.splitTextToSize(row.text,avail);
     for(let li=0;li<lines.length;li++){
-      if(used+lh>maxH+.01){col++;used=0;}
+      if(used+lh+.65>maxH+.01){col++;used=0;}
       if(col>=cols){col=cols-1;used=Math.max(0,maxH-lh);}
       const cx=x+col*(actualW+colGap),baseline=y+used+fs*.78;
       if(li===0&&row.bullet){doc.setFillColor(...C.white);doc.circle(cx+1.15,baseline-fs*.12,.65,'F');}
