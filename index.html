@@ -526,6 +526,9 @@ async function vkInitialize(){
  }
  }catch(err){console.error('IndexedDB initialisieren',err);window.vkStorageStatus='error';alert('Der neue Speicher konnte nicht initialisiert werden. Die bisherigen Daten bleiben vorerst unangetastet.');}
  state.seasons=state.seasons||[];state.seasonPhases=state.seasonPhases||[];state.seasonActiveId=state.seasonActiveId||'default';state.weekPlans=state.weekPlans||{};
+ // Normalize the exercises AFTER loading the persisted IndexedDB state, not before.
+ // This changes only formatting separators in the four text fields and saves the existing exercise objects.
+ if(normalizeExistingExerciseTexts())await persistState();
  try{if(navigator.storage?.persist)await navigator.storage.persist()}catch{}
  nav();el('todayLabel').textContent=today.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});renderAll();
 }
