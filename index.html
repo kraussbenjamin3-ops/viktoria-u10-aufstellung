@@ -89,6 +89,8 @@ const el=(id)=>document.getElementById(id);
 function nav(){el('nav').innerHTML=modules.map(([id,n])=>`<button onclick="show('${id}')" class="${id==='dashboard'?'active':''}" id="nav-${id}">${n}</button>`).join('')}
 function show(id){document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));el(id).classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));el('nav-'+id)?.classList.add('active');renderAll()}
 function normalizeExerciseText(v){let t=String(v??'').replace(/ {3,}/g,'\n● ').trim();if(!t)return t;let lines=t.split(/\r?\n/).map(line=>line.trim()).filter(Boolean);if(lines.length&&!/^[●•·▪◦-]\s*/.test(lines[0]))lines[0]='● '+lines[0];return lines.join('\n')}
+// Einmalige rückwirkende Formatierung aller bestehenden Übungen in der Datenbank
+(function migrateExerciseBullets(){let changed=false;const fields=['description','setup','variants','coachingOff','coachingDef','coaching'];(state.exercises||[]).forEach(x=>fields.forEach(k=>{if(x[k]!=null){let n=normalizeExerciseText(x[k]);if(n!==x[k]){x[k]=n;changed=true;}}}));if(changed)persistState();})();
 function card(title,content,span='span6'){return `<div class="card ${span}"><h2>${title}</h2>${content}</div>`}
 function selectPlayerOptions(selected=''){return state.players.map(p=>`<option ${p.name===selected?'selected':''}>${esc(p.name)}</option>`).join('')}
 function playerAvatar(p,size=30){if(!p)return '';let initials=(p.name||'?').split(/\s+/).map(x=>x[0]).slice(0,2).join('');return `<span class=\"player-mini-avatar\" style=\"width:${size}px;height:${size}px;flex:0 0 ${size}px\">${p.photo?`<img src=\"${p.photo}\" alt=\"\">`:`<span>${esc(initials)}</span>`}</span>`}
