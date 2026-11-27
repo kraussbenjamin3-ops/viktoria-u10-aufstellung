@@ -430,7 +430,7 @@ async function weekPdfExportNew(k){
   if(!window.jspdf?.jsPDF){alert('PDF-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen.');return;}
   const doc=new window.jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4'}),W=297,H=210;
   const C={red:[220,20,45],black:[15,15,19],panel:[32,32,38],white:[245,245,248],muted:[175,175,185]};
-  const clean=v=>String(v??'').replace(/%/g,'●').replace(/[\u0000-\u001f]/g,' ').trim();
+  const clean=v=>String(v??'').replace(/%Ï|%\u00cf|%\u2022/g,'●').replace(/(^|\n)(\s*)%(?=\s|$)/g,'$1$2●').replace(/[\u0000-\u001f]/g,' ').trim();
    const textLines=v=>String(v??'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
    const principles=v=>textLines(v).map(x=>{let bullet=/^\s*(?:%|[•●▪▫◦*\-])/.test(x);x=x.replace(/^\s*(?:%|[•●▪▫◦*\-]+)\s*/, '');return {bullet,text:clean(x)};}).filter(x=>x.text);
   const bg=n=>{if(WEEKPDF_NEW_BG[n-1])doc.addImage(WEEKPDF_NEW_BG[n-1],'PNG',0,0,W,H);};
@@ -438,7 +438,7 @@ async function weekPdfExportNew(k){
   const card=(x,y,w,h,title)=>{doc.setFillColor(...C.panel);doc.roundedRect(x,y,w,h,3,3,'F');doc.setDrawColor(...C.red);doc.setLineWidth(.6);doc.roundedRect(x,y,w,h,3,3,'S');doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(...C.red);doc.text(title,x+4,y+7);};
    // Textfelder: feste Schriftgröße pro Feld; Zeilen werden innerhalb der Feldhöhe begrenzt.
    const put=(v,x,y,w,size=9,maxH=40)=>{v=clean(v)||'—';doc.setFont('helvetica','normal');doc.setTextColor(...C.white);doc.setFontSize(size);let lines=doc.splitTextToSize(v,w),lh=size*.38+1.0,cap=Math.max(1,Math.floor(maxH/lh));if(lines.length>cap){lines=lines.slice(0,cap);let last=lines[cap-1]||'';while(last.length&&doc.getTextWidth(last+'…')>w)last=last.slice(0,-1);lines[cap-1]=last+'…';}doc.text(lines,x,y,{maxWidth:w});return Math.min(lines.length*lh,maxH);};
-   const bulletList=(arr,x,y,w,size=8,maxH=50)=>{let used=0,lh=size*.38+1.0;doc.setFont('helvetica','normal');doc.setFontSize(size);doc.setTextColor(...C.white);for(const item of arr){if(used+lh>maxH)break;let textLines=doc.splitTextToSize(item.text,w-4),cap=Math.max(1,Math.floor((maxH-used)/lh));if(textLines.length>cap){textLines=textLines.slice(0,cap);let last=textLines[cap-1]||'';while(last.length&&doc.getTextWidth(last+'…')>w-4)last=last.slice(0,-1);textLines[cap-1]=last+'…';}doc.setFillColor(...C.white);doc.circle(x+1.2,y+used+size*.25,0.65,'F');doc.text(textLines,x+4,y+used,{maxWidth:w-4});used+=textLines.length*lh+1;if(used>=maxH)break;}return used;};
+   const bulletList=(arr,x,y,w,size=8,maxH=50)=>{let used=0,lh=size*.38+1.0;doc.setFont('helvetica','normal');doc.setFontSize(size);doc.setTextColor(...C.white);for(const item of arr){if(!item.bullet)continue;if(used+lh>maxH)break;let textLines=doc.splitTextToSize(item.text,w-4),cap=Math.max(1,Math.floor((maxH-used)/lh));if(textLines.length>cap){textLines=textLines.slice(0,cap);let last=textLines[cap-1]||'';while(last.length&&doc.getTextWidth(last+'…')>w-4)last=last.slice(0,-1);textLines[cap-1]=last+'…';}doc.setFillColor(...C.white);doc.circle(x+1.2,y+used+size*.25,0.65,'F');doc.text(textLines,x+4,y+used,{maxWidth:w-4});used+=textLines.length*lh+1;if(used>=maxH)break;}return used;};
   bg(1);for(let n=2;n<=4;n++){doc.addPage();bg(n);}
   doc.addPage();bg(5);let wk=state.weekPlans[k]||{};pageTitle('WOCHENPRINZIPIEN',k);
   card(10,28,137,45,'OBERPRINZIP');put(wk.oberprinzip,15,40,127,13,32);
@@ -449,15 +449,15 @@ async function weekPdfExportNew(k){
   let weekDays=weekDateRange(k),sessions=state.sessions.filter(s=>s.date&&weekDays.includes(s.date)).sort((a,b)=>a.date.localeCompare(b.date));
   const weekday=s=>{try{return new Date(s.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long'});}catch{return s.date||'Training';}};
   const sessionPrinciples=s=>principles(s.principles||s.trainingPrinciples||s.phasePrinciples||'');
-  const coachingOrg=p=>Object.entries(p?.coachingAssignments||{}).filter(([role,coach])=>coach&&String(coach).trim()&&String(coach).trim()!=='—').map(([role,coach])=>`${role}: ${coach}`).join(' · ');
+  const coachingOrg=s=>{let rows=[];(s.phases||[]).forEach(p=>Object.entries(p.coachingAssignments||{}).forEach(([role,coach])=>{if(coach&&String(coach).trim()&&String(coach).trim()!=='—')rows.push(`${role}: ${coach}`);}));return [...new Set(rows)].join('\n');};
   // Jede Trainingsübersicht unmittelbar vor den Phasendetails dieses Trainings.
   for(let si=0;si<3;si++){
    let s=sessions[si]||null,ph=s?.phases||[];
    doc.addPage();pageTitle('TRAININGSÜBERSICHT',s?(s.name||'Training')+' · '+weekday(s):'Training '+(si+1)+' · nicht geplant');
    card(10,27,85,29,'TECHNIK');put(s?.tech||'—',15,40,75,10,14);card(101,27,85,29,'TAKTIK');put(s?.tactic||'—',106,40,75,10,14);card(192,27,95,29,'WOCHENZIEL');put(wk.goal,197,40,85,10,14);
-   card(10,61,277,54,'PHASEN · ZEITPLAN');let yy=73;ph.slice(0,6).forEach((p,i)=>{put((i+1)+'. '+clean(p.name)+' · '+(+p.duration||0)+' min',15,yy,265,9,10);yy+=10;let org=coachingOrg(p);if(org&&yy<108){put('Coaching: '+org,18,yy,260,7.5,8);yy+=8;}});if(!ph.length)put('Keine Phasen zugeordnet.',15,75,260,9,20);
+   card(10,61,277,54,'PHASEN · ZEITPLAN');let yy=73;ph.slice(0,6).forEach((p,i)=>{let coach=Object.entries(p.coachingAssignments||{}).filter(([r,c])=>c&&String(c).trim()&&String(c).trim()!=='—').map(([r,c])=>r+': '+c).join(' · ');let line=(i+1)+'. '+clean(p.name)+' · '+(+p.duration||0)+' min'+(coach?' | '+coach:'');put(line,15,yy,265,8.5,10);yy+=10;});if(!ph.length)put('Keine Phasen zugeordnet.',15,75,260,9,20);
    card(10,118,135,78,'PRINZIPIEN');bulletList(sessionPrinciples(s),15,130,125,8,60);
-   card(151,118,136,78,'COACHING · ORGANISATION');put('Coaching-Zuordnungen stehen direkt bei jeder Phase.',156,130,126,8,58);
+   card(151,118,136,78,'COACHING · ORGANISATION');put('Coaching siehe jeweilige Phase im Zeitplan.',156,130,126,8,58);
    for(let pi=0;pi<4;pi++){
     let p=ph[pi]||null;doc.addPage();let exIds=p?.exerciseIds||[],ex=exIds.map(id=>state.exercises.find(e=>String(e.id)===String(id))||p?.exerciseSnapshots?.[id]).filter(Boolean);pageTitle('PHASENDETAIL',s?(s.name||'Training')+' · '+clean(ex[0]?.name||p?.name||('Phase '+(pi+1))):'Training '+(si+1)+' · Phase '+(pi+1));
     card(10,27,277,18,'ÜBUNG');put(ex.map(e=>e.name||'').filter(Boolean).join(' · ')||p?.name||'Nicht belegt',15,39,265,9,12);
