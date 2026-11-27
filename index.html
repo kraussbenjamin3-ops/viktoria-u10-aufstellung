@@ -81,7 +81,7 @@ async function vkRestoreBackup(ts){const list=await vkListBackups(),b=list.find(
 async function vkDownloadBackup(ts){const list=await vkListBackups(),b=list.find(x=>x.timestamp===Number(ts));if(!b)return;let a=document.createElement('a'),blob=new Blob([JSON.stringify(b.state,null,2)],{type:'application/json'});a.href=URL.createObjectURL(blob);a.download='viktoria-u10-auto-backup-'+new Date(b.timestamp).toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 async function persistState(){try{await vkPutState(state);window.vkStorageStatus='ok';await vkAutoBackup()}catch(e){window.vkStorageStatus='error';console.error('IndexedDB speichern fehlgeschlagen',e);alert('Speichern fehlgeschlagen. Bitte sofort ein Backup exportieren.')} }
 try{state={...state,...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch{}
-state.seasons=state.seasons||[];state.seasonPhases=state.seasonPhases||[];state.seasonActiveId=state.seasonActiveId||'default';state.weekPlans=state.weekPlans||{};
+state.seasons=state.seasons||[];state.seasonPhases=state.seasonPhases||[];state.seasonActiveId=state.seasonActiveId||'default';state.weekPlans=state.weekPlans||{};if(normalizeExistingExerciseTexts())persistState();
 const save=()=>{persistState();renderAll()};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today=new Date(),dateStr=d=>new Date(d).toLocaleDateString('de-DE'),fmtDateDE=d=>{if(!d)return '';let z=String(d).trim(),a;if((a=z.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)))return `${String(a[3]).padStart(2,'0')}.${String(a[2]).padStart(2,'0')}.${a[1]}`;if((a=z.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/)))return `${String(a[1]).padStart(2,'0')}.${String(a[2]).padStart(2,'0')}.${a[3]}`;return z;},dateInputValue=d=>{if(!d)return '';let z=String(d).trim(),a;if((a=z.match(/^\d{4}-\d{2}-\d{2}$/)))return z;if((a=z.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/)))return `${a[3]}-${String(a[2]).padStart(2,'0')}-${String(a[1]).padStart(2,'0')}`;return ''},iso=d=>{let x=new Date(d);return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`};
@@ -503,6 +503,23 @@ function showToast(msg){let t=document.getElementById('app-toast');if(!t){t=docu
 function autoUpdateTrainingStatuses(){const todayKey=iso(today),weekStart=new Date(today);weekStart.setHours(0,0,0,0);weekStart.setDate(weekStart.getDate()-((weekStart.getDay()+6)%7));const weekEnd=new Date(weekStart);weekEnd.setDate(weekEnd.getDate()+6);const startKey=iso(weekStart),endKey=iso(weekEnd);let changed=false;for(const s of (state.sessions||[])){if(s.template||!s.date||s.status==='Archiviert')continue;if(s.date<todayKey){if(s.status!=='Durchgeführt'){s.status='Durchgeführt';changed=true;}}else if(s.date>=startKey&&s.date<=endKey&&s.status==='Entwurf'){s.status='Geplant';changed=true;}}if(changed)persistState();}
 function renderAll(){autoUpdateTrainingStatuses();dashboard();training();exercises();development();matches();team();season();tasks();settings();lineup()}
 window.addEventListener('message',e=>{let d=e.data;if(!d||d.type!=='vkLineupImageSaved'||!d.matchId||!['A','B'].includes(d.team)||!d.data)return;let m=state.matches.find(x=>String(x.id)===String(d.matchId));if(!m){showToast('Spiel nicht mehr gefunden – Bild nicht gespeichert');return;}m.lineupImages=m.lineupImages||{};m.lineupImages[d.team]=d.data;save();if(el('matches')?.classList.contains('active'))matchDetail(m.id);showToast('Aufstellung Team '+d.team+' im Spiel gespeichert');});
+function normalizeExerciseBulletText(value){
+ if(typeof value!=="string"||!value.trim())return value;
+ // Convert legacy spacing separators (3+ spaces) into bullet-separated lines.
+ let parts=value.split(/\s{3,}/).map(v=>v.trim()).filter(Boolean);
+ if(parts.length===1){let t=parts[0];return /^●\s*/.test(t)?t:'● '+t;}
+ return parts.map((part,i)=>/^●\s*/.test(part)?part:'● '+part).join('\n');
+}
+function normalizeExistingExerciseTexts(){
+ let changed=false;
+ for(const x of (state.exercises||[])){
+  for(const key of ['description','variants','coachingOff','coachingDef']){
+   if(typeof x[key]==='string'&&x[key].trim()){let n=normalizeExerciseBulletText(x[key]);if(n!==x[key]){x[key]=n;changed=true;}}
+  }
+  if(!x.coachingOff&&typeof x.coaching==='string'&&x.coaching.trim()){let n=normalizeExerciseBulletText(x.coaching);if(n!==x.coaching){x.coaching=n;changed=true;}}
+ }
+ return changed;
+}
 async function vkInitialize(){
  try{const stored=await vkGetState();if(stored&&typeof stored==='object'){state={...state,...stored};window.vkStorageStatus='ok'}else{ // migration of existing localStorage payload into IndexedDB
    await vkPutState(state);window.vkStorageStatus='migrated';
