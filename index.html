@@ -440,24 +440,25 @@ async function weekPdfExportNew(k){
    const put=(v,x,y,w,size=9,maxH=40)=>{v=clean(v)||'—';doc.setFont('helvetica','normal');doc.setTextColor(...C.white);doc.setFontSize(size);let lines=doc.splitTextToSize(v,w),lh=size*.38+1.0,cap=Math.max(1,Math.floor(maxH/lh));if(lines.length>cap){lines=lines.slice(0,cap);let last=lines[cap-1]||'';while(last.length&&doc.getTextWidth(last+'…')>w)last=last.slice(0,-1);lines[cap-1]=last+'…';}doc.text(lines,x,y,{maxWidth:w});return Math.min(lines.length*lh,maxH);};
    const putMarked=(v,x,y,w,size=8,maxH=40)=>{
   const rows=principles(v);if(!rows.length)return 0;
-  // Render each visual line individually so the bullet is anchored to the first baseline only.
-  // jsPDF's internal multi-line leading is not reliably identical to our height estimate.
-  const lh=size*.48+1.15,usedStart=0;let used=usedStart;
-  doc.setFont('helvetica','normal');doc.setFontSize(size);doc.setTextColor(...C.white);
+  const lh=size*.48+1.15;doc.setFont('helvetica','normal');doc.setFontSize(size);doc.setTextColor(...C.white);
+  // Estimate total height. Use columns only when a single column would overflow.
+  const fullLines=rows.reduce((n,row)=>n+doc.splitTextToSize(row.text,w-(row.bullet?4:0)).length,0);
+  const singleHeight=fullLines*lh+rows.length*.65;
+  const cols=singleHeight>maxH?Math.min(3,Math.max(2,Math.ceil(singleHeight/maxH))):1;
+  const cw=w/cols, colGap=1.5, actualW=(w-(cols-1)*colGap)/cols;
+  let col=0,used=0;
   for(const row of rows){
-    const indent=row.bullet?4:0,avail=w-indent;let lines=doc.splitTextToSize(row.text,avail);
-    const remaining=Math.max(0,maxH-used),cap=Math.max(0,Math.floor((remaining+0.01)/lh));
-    if(!cap)break;
-    if(lines.length>cap){lines=lines.slice(0,cap);if(lines.length){let last=String(lines[lines.length-1]);while(last.length&&doc.getTextWidth(last+'…')>avail)last=last.slice(0,-1);lines[lines.length-1]=last+'…';}}
+    const indent=row.bullet?4:0,avail=actualW-indent;
+    let lines=doc.splitTextToSize(row.text,avail);
     for(let li=0;li<lines.length;li++){
-      const baseline=y+used+size*.78;
-      if(li===0&&row.bullet){doc.setFillColor(...C.white);doc.circle(x+1.15,baseline-size*.12,.65,'F');}
-      doc.text(String(lines[li]),x+indent,baseline,{maxWidth:avail});
-      used+=lh;
+      if(used+lh>maxH+0.01){col++;used=0;if(col>=cols){col=cols-1;used=Math.max(0,maxH-lh);}}
+      const cx=x+col*(actualW+colGap),baseline=y+used+size*.78;
+      if(li===0&&row.bullet){doc.setFillColor(...C.white);doc.circle(cx+1.15,baseline-size*.12,.65,'F');}
+      doc.text(String(lines[li]),cx+indent,baseline,{maxWidth:avail});used+=lh;
     }
-    used+=.65;if(used>=maxH)break;
+    used+=.65;
   }
-  return Math.min(used,maxH);
+  return Math.min(maxH,used);
 };
 const bulletList=(arr,x,y,w,size=8,maxH=50)=>putMarked(arr.map(i=>(i.bullet?'% ':'')+i.text).join('\n'),x,y,w,size,maxH);
   bg(1);for(let n=2;n<=4;n++){doc.addPage();bg(n);}
