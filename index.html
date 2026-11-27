@@ -505,13 +505,15 @@ function renderAll(){autoUpdateTrainingStatuses();dashboard();training();exercis
 window.addEventListener('message',e=>{let d=e.data;if(!d||d.type!=='vkLineupImageSaved'||!d.matchId||!['A','B'].includes(d.team)||!d.data)return;let m=state.matches.find(x=>String(x.id)===String(d.matchId));if(!m){showToast('Spiel nicht mehr gefunden – Bild nicht gespeichert');return;}m.lineupImages=m.lineupImages||{};m.lineupImages[d.team]=d.data;save();if(el('matches')?.classList.contains('active'))matchDetail(m.id);showToast('Aufstellung Team '+d.team+' im Spiel gespeichert');});
 function normalizeExerciseBulletText(value){
  if(typeof value!=="string"||!value.trim())return value;
- // Convert legacy multi-space separators to bullets, while keeping ordinary wrapped lines intact.
- const chunks=value.split(/\s{3,}/).map(v=>v.trim()).filter(Boolean);
- if(chunks.length>1)return chunks.map(v=>/^●\s*/.test(v)?v:'● '+v).join('\n');
- const t=value.trim();
- // Preserve existing bullet lines and their wrapped continuation text.
- if(t.split(/\r?\n/).some(line=>/^\s*●\s*/.test(line)))return t;
- return '● '+t;
+ // Only convert clear legacy separators (3+ spaces); preserve line breaks and ordinary spaces.
+ const lines=value.split(/\r?\n/).map(line=>{
+  const chunks=line.split(/\s{3,}/).map(v=>v.trim()).filter(Boolean);
+  if(chunks.length>1)return chunks.map(v=>/^●\s*/.test(v)?v:'● '+v).join('\n');
+  const t=line.trim();
+  if(!t)return '';
+  return /^●\s*/.test(t)?t:'● '+t;
+ });
+ return lines.join('\n');
 }
 function normalizeExistingExerciseTexts(){
  let changed=false;
@@ -522,6 +524,23 @@ function normalizeExistingExerciseTexts(){
  }
  return changed;
 }
+async function vkSaveFormattingSafely(){
+ const before=JSON.parse(JSON.stringify(state));
+ const counts={players:(state.players||[]).length,exercises:(state.exercises||[]).length,sessions:(state.sessions||[]).length,matches:(state.matches||[]).length};
+ if(counts.exercises===0)return false;
+ // Save an immutable pre-format snapshot before changing the persistent state.
+ const db=await vkOpenDB();
+ await new Promise((resolve,reject)=>{const tx=db.transaction(VK_BACKUP_STORE,'readwrite');tx.objectStore(VK_BACKUP_STORE).put({timestamp:Date.now(),state:before,reason:'pre-format-safety'});tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)});
+ db.close();
+ if(!normalizeExistingExerciseTexts())return false;
+ const after={players:(state.players||[]).length,exercises:(state.exercises||[]).length,sessions:(state.sessions||[]).length,matches:(state.matches||[]).length};
+ if(Object.keys(counts).some(k=>counts[k]!==after[k])){state=before;throw new Error('Formatprüfung fehlgeschlagen: Datensatzanzahlen verändert.');}
+ await vkPutState(state);
+ const verify=await vkGetState();
+ const verified={players:(verify?.players||[]).length,exercises:(verify?.exercises||[]).length,sessions:(verify?.sessions||[]).length,matches:(verify?.matches||[]).length};
+ if(Object.keys(counts).some(k=>counts[k]!==verified[k])){state=before;await vkPutState(before);throw new Error('Speicherprüfung fehlgeschlagen; vorheriger Zustand wurde zurückgesetzt.');}
+ return true;
+}
 async function vkInitialize(){
  try{const stored=await vkGetState();if(stored&&typeof stored==='object'){state={...state,...stored};window.vkStorageStatus='ok'}else{ // migration of existing localStorage payload into IndexedDB
    await vkPutState(state);window.vkStorageStatus='migrated';
@@ -530,7 +549,7 @@ async function vkInitialize(){
  state.seasons=state.seasons||[];state.seasonPhases=state.seasonPhases||[];state.seasonActiveId=state.seasonActiveId||'default';state.weekPlans=state.weekPlans||{};
  // Normalize the exercises AFTER loading the persisted IndexedDB state, not before.
  // This changes only formatting separators in the four text fields and saves the existing exercise objects.
- if(normalizeExistingExerciseTexts())await persistState();
+ try{await vkSaveFormattingSafely()}catch(err){console.error("Sichere Übungsformatierung",err);alert("Die Übungsformatierung wurde abgebrochen. Der vorherige Datenbestand wurde geschützt.");}
  try{if(navigator.storage?.persist)await navigator.storage.persist()}catch{}
  nav();el('todayLabel').textContent=today.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});renderAll();
 }
