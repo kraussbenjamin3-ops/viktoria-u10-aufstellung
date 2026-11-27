@@ -505,18 +505,20 @@ function renderAll(){autoUpdateTrainingStatuses();dashboard();training();exercis
 window.addEventListener('message',e=>{let d=e.data;if(!d||d.type!=='vkLineupImageSaved'||!d.matchId||!['A','B'].includes(d.team)||!d.data)return;let m=state.matches.find(x=>String(x.id)===String(d.matchId));if(!m){showToast('Spiel nicht mehr gefunden – Bild nicht gespeichert');return;}m.lineupImages=m.lineupImages||{};m.lineupImages[d.team]=d.data;save();if(el('matches')?.classList.contains('active'))matchDetail(m.id);showToast('Aufstellung Team '+d.team+' im Spiel gespeichert');});
 function normalizeExerciseBulletText(value){
  if(typeof value!=="string"||!value.trim())return value;
- // Convert legacy spacing separators (3+ spaces) into bullet-separated lines.
- let parts=value.split(/\s{3,}/).map(v=>v.trim()).filter(Boolean);
- if(parts.length===1){let t=parts[0];return /^●\s*/.test(t)?t:'● '+t;}
- return parts.map((part,i)=>/^●\s*/.test(part)?part:'● '+part).join('\n');
+ // Convert legacy multi-space separators to bullets, while keeping ordinary wrapped lines intact.
+ const chunks=value.split(/\s{3,}/).map(v=>v.trim()).filter(Boolean);
+ if(chunks.length>1)return chunks.map(v=>/^●\s*/.test(v)?v:'● '+v).join('\n');
+ const t=value.trim();
+ // Preserve existing bullet lines and their wrapped continuation text.
+ if(t.split(/\r?\n/).some(line=>/^\s*●\s*/.test(line)))return t;
+ return '● '+t;
 }
 function normalizeExistingExerciseTexts(){
  let changed=false;
  for(const x of (state.exercises||[])){
-  for(const key of ['description','variants','coachingOff','coachingDef']){
+  for(const key of ['description','variants','coachingOff','coachingDef','coaching']){
    if(typeof x[key]==='string'&&x[key].trim()){let n=normalizeExerciseBulletText(x[key]);if(n!==x[key]){x[key]=n;changed=true;}}
   }
-  if(!x.coachingOff&&typeof x.coaching==='string'&&x.coaching.trim()){let n=normalizeExerciseBulletText(x.coaching);if(n!==x.coaching){x.coaching=n;changed=true;}}
  }
  return changed;
 }
