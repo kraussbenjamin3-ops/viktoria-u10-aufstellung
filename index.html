@@ -464,9 +464,9 @@ const bulletList=(arr,x,y,w,size=8,maxH=50)=>putMarked(arr.map(i=>(i.bullet?'% '
   doc.addPage();bg(5);let wk=state.weekPlans[k]||{};pageTitle('WOCHENPRINZIPIEN',k);
   card(10,28,137,45,'OBERPRINZIP');put(wk.oberprinzip,15,40,127,13,32);
   card(150,28,137,45,'GEGENPRINZIP');put(wk.gegenprinzip,155,40,127,13,32);
-  card(10,76,137,36,'UNTERPRINZIPIEN · OBER');bulletList(principles(wk.oberUnterprinzipien),15,88,127,8,22);
-  card(150,76,137,36,'UNTERPRINZIPIEN · GEGEN');bulletList(principles(wk.gegenUnterprinzipien),155,88,127,8,22);
-  [['INDIVIDUAL',wk.individualPrinzipien,10],['GRUPPE',wk.gruppenPrinzipien,105],['MANNSCHAFT',wk.mannschaftPrinzipien,200]].forEach(([t,v,x])=>{card(x,118,87,78,t+' · PRINZIPIEN');bulletList(principles(v),x+5,130,77,8,60);});
+  card(10,76,137,45,'UNTERPRINZIPIEN · OBER');bulletList(principles(wk.oberUnterprinzipien),15,88,127,7.5,31);
+  card(150,76,137,45,'UNTERPRINZIPIEN · GEGEN');bulletList(principles(wk.gegenUnterprinzipien),155,88,127,7.5,31);
+  [['INDIVIDUAL',wk.individualPrinzipien,10],['GRUPPE',wk.gruppenPrinzipien,105],['MANNSCHAFT',wk.mannschaftPrinzipien,200]].forEach(([t,v,x])=>{card(x,126,87,70,t+' · PRINZIPIEN');bulletList(principles(v),x+5,138,77,7.5,53);});
   let weekDays=weekDateRange(k),sessions=state.sessions.filter(s=>s.date&&weekDays.includes(s.date)).sort((a,b)=>a.date.localeCompare(b.date));
   const weekday=s=>{try{return new Date(s.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long'});}catch{return s.date||'Training';}};
   const sessionPrinciples=s=>principles(s.principles||s.trainingPrinciples||s.phasePrinciples||'');
@@ -483,15 +483,15 @@ const bulletList=(arr,x,y,w,size=8,maxH=50)=>putMarked(arr.map(i=>(i.bullet?'% '
     let p=ph[pi]||null;doc.addPage();let exIds=p?.exerciseIds||[],ex=exIds.map(id=>state.exercises.find(e=>String(e.id)===String(id))||p?.exerciseSnapshots?.[id]).filter(Boolean);pageTitle('PHASENDETAIL',s?(s.name||'Training')+' · '+clean(ex[0]?.name||p?.name||('Phase '+(pi+1))):'Training '+(si+1)+' · Phase '+(pi+1));
     card(10,27,277,18,'ÜBUNG');put(ex.map(e=>e.name||'').filter(Boolean).join(' · ')||p?.name||'Nicht belegt',15,39,265,9,12);
     const exPrinciples=p?.principles||'';
-    card(10,49,277,29,'ÜBUNGSPRINZIPIEN');bulletList(principles(exPrinciples),15,61,265,7.5,18);
+    card(10,49,277,38,'ÜBUNGSPRINZIPIEN');bulletList(principles(exPrinciples),15,61,265,7.2,27);
     const combined=(fields)=>ex.map(e=>{let v=fields.map(f=>e[f]).find(v=>v&&String(v).trim());return v||'';}).filter(Boolean).join('\n\n')||'—';
-    card(10,82,77,51,'ABLAUF');putMarked(combined(['description','setup','ablauf']),15,94,67,7.5,38);
-    card(10,137,77,56,'VARIANTEN');putMarked(combined(['variants','variations']),15,149,67,7.5,42);
-    card(210,82,77,51,'COACHING OFF');putMarked(combined(['coachingOff','coaching','offensiveCoaching']),215,94,67,7.5,38);
-    card(210,137,77,56,'COACHING DEF');putMarked(combined(['coachingDef','defensiveCoaching']),215,149,67,7.5,42);
-    card(91,82,114,111,'ÜBUNGSBILD');
+    card(10,91,77,46,'ABLAUF');putMarked(combined(['description','setup','ablauf']),15,103,67,7.2,33);
+    card(10,141,77,52,'VARIANTEN');putMarked(combined(['variants','variations']),15,153,67,7.2,38);
+    card(210,91,77,46,'COACHING OFF');putMarked(combined(['coachingOff','coaching','offensiveCoaching']),215,103,67,7.2,33);
+    card(210,141,77,52,'COACHING DEF');putMarked(combined(['coachingDef','defensiveCoaching']),215,153,67,7.2,38);
+    card(91,91,114,102,'ÜBUNGSBILD');
     let image=ex.flatMap(e=>{let a=e.images||e.image||e.picture||e.imageData||e.photo||[];return Array.isArray(a)?a:[a];}).find(v=>typeof v==='string'&&(v.startsWith('data:image/')||v.startsWith('data:')));
-    if(image){try{let fmt=image.includes('image/jpeg')?'JPEG':image.includes('image/webp')?'WEBP':'PNG',props=doc.getImageProperties(image),ratio=props.width/props.height,boxW=104,boxH=105,w=boxW,h=boxH;if(ratio>boxW/boxH){h=boxW/ratio;}else{w=boxH*ratio;}doc.addImage(image,fmt,96+(boxW-w)/2,94+(boxH-h)/2,w,h,'','FAST');}catch(err){put('Bild konnte nicht eingebettet werden.',96,112,104,8,20);}}else put('Kein gespeichertes Übungsbild',96,112,104,8,20);
+    if(image){try{let fmt=image.includes('image/jpeg')?'JPEG':image.includes('image/webp')?'WEBP':'PNG',props=doc.getImageProperties(image),ratio=props.width/props.height,boxW=104,boxH=96,w=boxW,h=boxH;if(ratio>boxW/boxH){h=boxW/ratio;}else{w=boxH*ratio;}doc.addImage(image,fmt,96+(boxW-w)/2,103+(boxH-h)/2,w,h,'','FAST');}catch(err){put('Bild konnte nicht eingebettet werden.',96,112,104,8,20);}}else put('Kein gespeichertes Übungsbild',96,112,104,8,20);
     doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(...C.white);doc.text((p?.players||'—')+' Spieler · '+(+p?.duration||0)+' min',148,183,{align:'center'});
    }
   }
