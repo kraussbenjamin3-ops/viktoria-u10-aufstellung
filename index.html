@@ -430,16 +430,15 @@ async function weekPdfExportNew(k){
   if(!window.jspdf?.jsPDF){alert('PDF-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen.');return;}
   const doc=new window.jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4'}),W=297,H=210;
   const C={red:[220,20,45],black:[15,15,19],panel:[32,32,38],white:[245,245,248],muted:[175,175,185]};
-  const clean=v=>String(v??'').replace(/%Ï|%\u00cf|%\u2022/g,'●').replace(/(^|\n)\s*%(?=\s|$)/g,'$1●').replace(/^[\s]*[•●▪▫◦*\-]+\s*/,'').replace(/[\u0000-\u001f]/g,' ').replace(/\s+/g,' ').trim();
-  const textLines=v=>String(v??'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-  const principles=v=>textLines(v).map(x=>{x=x.replace(/^\s*%\s*/, '• ');return {bullet:/^[\s]*[•●▪▫◦*\-]/.test(x),text:clean(x.replace(/^[\s]*[•●▪▫◦*\-]+\s*/,''))};}).filter(x=>x.text);
+  const clean=v=>String(v??'').replace(/%Ï|%\u00cf|%\u2022/g,'●').replace(/(^|\n)\s*%(?=\s|$)/g,'$1●').replace(/[\u0000-\u001f]/g,' ').trim();
+   const textLines=v=>String(v??'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+   const principles=v=>textLines(v).map(x=>{let bullet=/^\s*(?:%|[•●▪▫◦*\-])/.test(x);x=x.replace(/^\s*(?:%|[•●▪▫◦*\-]+)\s*/, '');return {bullet,text:clean(x)};}).filter(x=>x.text);
   const bg=n=>{if(WEEKPDF_NEW_BG[n-1])doc.addImage(WEEKPDF_NEW_BG[n-1],'PNG',0,0,W,H);};
   const pageTitle=(title,sub='')=>{if(doc.getNumberOfPages()>=5){try{doc.addImage(WEEKPDF_BG_FROM_PAGE5,'PNG',0,0,W,H);}catch(e){doc.setFillColor(...C.black);doc.rect(0,0,W,H,'F');}}doc.setFillColor(...C.black);doc.rect(0,0,W,22,'F');doc.setTextColor(...C.red);doc.setFont('helvetica','bold');let titleFs=17;while(titleFs>9&&doc.getTextWidth(title)>W-28){titleFs-=.5;doc.setFontSize(titleFs);}doc.text(doc.splitTextToSize(title,W-28).slice(0,1),14,13);doc.setTextColor(...C.white);doc.setFontSize(9);if(sub){let subTxt=doc.splitTextToSize(sub,W-28);doc.text(subTxt.slice(0,1),14,19);}};
   const card=(x,y,w,h,title)=>{doc.setFillColor(...C.panel);doc.roundedRect(x,y,w,h,3,3,'F');doc.setDrawColor(...C.red);doc.setLineWidth(.6);doc.roundedRect(x,y,w,h,3,3,'S');doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(...C.red);doc.text(title,x+4,y+7);};
-  // Text-Schutz: Schrift automatisch verkleinern, Zeilenhöhe berechnen und notfalls
-  // sauber am Feldende kürzen. Kein Text wird außerhalb der vorgesehenen Fläche gesetzt.
-  const put=(v,x,y,w,size=9,maxH=40)=>{v=clean(v)||'—';doc.setFont('helvetica','normal');doc.setTextColor(...C.white);let fs=size,a,lh,cap;const minFs=5.2;do{doc.setFontSize(fs);a=doc.splitTextToSize(v,w);lh=fs*.38+1.0;cap=Math.max(1,Math.floor(maxH/lh));if(a.length<=cap)break;fs-=.35;}while(fs>=minFs);doc.setFontSize(fs);if(a.length>cap){a=a.slice(0,cap);if(cap>0){let last=a[cap-1];while(last.length&&doc.getTextWidth(last+'…')>w)last=last.slice(0,-1);a[cap-1]=last+'…';}}doc.text(a,x,y,{maxWidth:w});return Math.min(a.length*lh,maxH);};
-  const bulletList=(arr,x,y,w,size=8,maxH=50)=>{let used=0;for(let item of arr){let prefix=item.bullet?'• ':'',h=put(prefix+item.text,x,y+used,w,size,maxH-used);used+=h+1;if(used>=maxH)break;}return used;};
+   // Textfelder: feste Schriftgröße pro Feld; Zeilen werden innerhalb der Feldhöhe begrenzt.
+   const put=(v,x,y,w,size=9,maxH=40)=>{v=clean(v)||'—';doc.setFont('helvetica','normal');doc.setTextColor(...C.white);doc.setFontSize(size);let lines=doc.splitTextToSize(v,w),lh=size*.38+1.0,cap=Math.max(1,Math.floor(maxH/lh));if(lines.length>cap){lines=lines.slice(0,cap);let last=lines[cap-1]||'';while(last.length&&doc.getTextWidth(last+'…')>w)last=last.slice(0,-1);lines[cap-1]=last+'…';}doc.text(lines,x,y,{maxWidth:w});return Math.min(lines.length*lh,maxH);};
+   const bulletList=(arr,x,y,w,size=8,maxH=50)=>{let used=0,lh=size*.38+1.0;doc.setFont('helvetica','normal');doc.setFontSize(size);doc.setTextColor(...C.white);for(const item of arr){if(used+lh>maxH)break;let textLines=doc.splitTextToSize(item.text,w-4),cap=Math.max(1,Math.floor((maxH-used)/lh));if(textLines.length>cap){textLines=textLines.slice(0,cap);let last=textLines[cap-1]||'';while(last.length&&doc.getTextWidth(last+'…')>w-4)last=last.slice(0,-1);textLines[cap-1]=last+'…';}doc.setFillColor(...C.white);doc.circle(x+1.2,y+used+size*.25,0.65,'F');doc.text(textLines,x+4,y+used,{maxWidth:w-4});used+=textLines.length*lh+1;if(used>=maxH)break;}return used;};
   bg(1);for(let n=2;n<=4;n++){doc.addPage();bg(n);}
   doc.addPage();bg(5);let wk=state.weekPlans[k]||{};pageTitle('WOCHENPRINZIPIEN',k);
   card(10,28,137,45,'OBERPRINZIP');put(wk.oberprinzip,15,40,127,13,32);
