@@ -82,7 +82,7 @@ async function vkDownloadBackup(ts){const list=await vkListBackups(),b=list.find
 let __vkSaveBaseline=null,__vkSaveBlocked=false;
 function __vkCoreCounts(o){o=o||{};return {players:Array.isArray(o.players)?o.players.length:0,exercises:Array.isArray(o.exercises)?o.exercises.length:0,sessions:Array.isArray(o.sessions)?o.sessions.length:0,matches:Array.isArray(o.matches)?o.matches.length:0,weekPlans:o.weekPlans&&typeof o.weekPlans==='object'?Object.keys(o.weekPlans).length:0,development:o.development&&typeof o.development==='object'?Object.keys(o.development).length:0};}
 function __vkShrinkRisk(prev,next){let a=__vkCoreCounts(prev),b=__vkCoreCounts(next),drops=[];for(let k of Object.keys(a)){if(a[k]>=5&&b[k]<a[k]*.5)drops.push(k+': '+a[k]+' → '+b[k]);}return drops.length>=2?drops:null;}
-async function persistState(){try{if(!__vkSaveBaseline){const disk=await vkGetState();if(disk&&typeof disk==='object'){__vkSaveBaseline=JSON.parse(JSON.stringify(disk));}else{__vkSaveBaseline=JSON.parse(JSON.stringify(state));}}let risk=__vkShrinkRisk(__vkSaveBaseline,state);if(risk&&!window.__vkAllowLargeChange){state=JSON.parse(JSON.stringify(__vkSaveBaseline));alert('Sicherheitsstopp: Der Datenbestand ist ungewöhnlich stark geschrumpft. Die letzte geprüfte Version wurde wiederhergestellt und NICHT überschrieben. Betroffen: '+risk.join('; '));renderAll();return;}await vkPutState(state);__vkSaveBaseline=JSON.parse(JSON.stringify(state));window.__vkAllowLargeChange=false;window.vkStorageStatus='ok';await vkAutoBackup()}catch(e){window.vkStorageStatus='error';console.error('IndexedDB speichern fehlgeschlagen',e);alert('Speichern fehlgeschlagen. Bitte sofort ein Backup exportieren.')} }
+async function persistState(){try{if(!__vkSaveBaseline){const disk=await vkGetState();if(disk&&typeof disk==='object'){__vkSaveBaseline=JSON.parse(JSON.stringify(disk));}else{__vkSaveBaseline=JSON.parse(JSON.stringify(state));}}let risk=__vkShrinkRisk(__vkSaveBaseline,state);if(risk&&!window.__vkAllowLargeChange){state=JSON.parse(JSON.stringify(__vkSaveBaseline));window.vkStorageStatus='protected';showToast('Sicherheitsstopp: Ein ungewöhnlicher Datenrückgang wurde erkannt. Der geprüfte Speicherstand wurde NICHT überschrieben. Betroffen: '+risk.join('; '));renderAll();return;}await vkPutState(state);__vkSaveBaseline=JSON.parse(JSON.stringify(state));window.__vkAllowLargeChange=false;window.vkStorageStatus='ok';await vkAutoBackup()}catch(e){window.vkStorageStatus='error';console.error('IndexedDB speichern fehlgeschlagen',e);showToast('Speichern fehlgeschlagen. Bitte ein Backup exportieren.')} }
 try{state={...state,...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch{}
 state.seasons=state.seasons||[];state.seasonPhases=state.seasonPhases||[];state.seasonActiveId=state.seasonActiveId||'default';state.weekPlans=state.weekPlans||{};if(normalizeExistingExerciseTexts())persistState();
 const save=()=>{persistState();renderAll()};
@@ -533,6 +533,7 @@ async function vkInitialize(){
  try{if(navigator.storage?.persist)await navigator.storage.persist()}catch{}
  nav();el('todayLabel').textContent=today.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});renderAll();
 }
+window.VK_BUILD_ID='SAVE-GUARD-RACEFIX-20261127';
 vkInitialize();
 
 /* Einheitliche app-interne Hinweisleiste statt nativer alert-Pop-ups */
