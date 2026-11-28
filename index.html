@@ -513,7 +513,7 @@ const bulletList=(arr,x,y,w,size=8,maxH=50)=>putMarked(arr.map(i=>(i.bullet?'% '
   bg(1);
   // Kalenderwoche als dynamischer Titel auf der Coverseite, im Bereich des grauen V.
   const weekMatch=String(k||'').match(/(?:KW|W)(\d{1,2})/i);const weekLabel=weekMatch?'KW'+String(weekMatch[1]).padStart(2,'0'):String(k||'').slice(-2);
-  doc.setFont('helvetica','bold');doc.setFontSize(32);doc.setTextColor(220,20,45);doc.text(weekLabel,118,92,{align:'center'});
+  doc.setFont('helvetica','bold');doc.setFontSize(32);doc.setTextColor(220,20,45);doc.text(weekLabel,72,48,{align:'center'});
   for(let n=2;n<=4;n++){doc.addPage();bg(n);}
   // Spiele der exportierten Woche ausschließlich im roten Feld rechts auf Seite 4.
   try{
@@ -527,7 +527,7 @@ const bulletList=(arr,x,y,w,size=8,maxH=50)=>putMarked(arr.map(i=>(i.bullet?'% '
       const logo=m.logo||m.opponentLogo||m.image;
       if(typeof logo==='string'&&logo.startsWith('data:image/')){try{const fmt=logo.includes('image/jpeg')?'JPEG':logo.includes('image/webp')?'WEBP':'PNG';doc.addImage(logo,fmt,fx+9,y+13,16,16,'','FAST');}catch(e){}}
       doc.setFont('helvetica','bold');doc.setFontSize(8);const nameLines=doc.splitTextToSize(String(m.opponent||'Gegner'),fw-2).slice(0,3);doc.text(nameLines,fx+fw/2,y+34,{align:'center'});
-      doc.setFont('helvetica','normal');doc.setFontSize(9);doc.text(String(m.time||'— Uhr'),fx+fw/2,y+slot-5,{align:'center'});
+      doc.setFont('helvetica','normal');doc.setFontSize(9);doc.text(String(m.time||'— Uhr'),fx+fw/2,y+34+nameLines.length*4.2+5,{align:'center'});
       if(i<limit-1){doc.setDrawColor(255,255,255);doc.setLineWidth(.35);doc.line(fx+2,y+slot,fx+fw-2,y+slot);}
     });
   }catch(e){console.warn('Spielinfos auf Seite 4 konnten nicht eingebettet werden',e);}
@@ -645,6 +645,8 @@ async function vkInitialize(){
  }
  }catch(err){console.error('IndexedDB initialisieren',err);window.vkStorageStatus='error';alert('Der neue Speicher konnte nicht initialisiert werden. Die bisherigen Daten bleiben vorerst unangetastet.');}
  state.seasons=state.seasons||[];state.seasonPhases=state.seasonPhases||[];state.seasonActiveId=state.seasonActiveId||'default';state.weekPlans=state.weekPlans||{};
+ // Beim Start ältere Sicherungen sicher entfernen: nur die 3 neuesten Backup-Einträge behalten.
+ try{const backupDb=await vkOpenDB();await vkTrimBackups(backupDb);backupDb.close();}catch(err){console.warn('Backup-Bereinigung beim Start fehlgeschlagen',err);}
  // Normalize the exercises AFTER loading the persisted IndexedDB state, not before.
  // This changes only formatting separators in the four text fields and saves the existing exercise objects.
  // Startup-Schutz/Formatierungsprüfung deaktiviert, um die App-Initialisierung zu entlasten.
