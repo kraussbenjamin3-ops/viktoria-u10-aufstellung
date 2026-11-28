@@ -470,44 +470,27 @@ async function weekPdfExportNew(k){
    const put=(v,x,y,w,size=9,maxH=40)=>{v=clean(v)||'—';doc.setFont('helvetica','normal');doc.setTextColor(...C.white);doc.setFontSize(size);let lines=doc.splitTextToSize(v,w),lh=size*.38+1.0,cap=Math.max(1,Math.floor(maxH/lh));if(lines.length>cap){lines=lines.slice(0,cap);let last=lines[cap-1]||'';while(last.length&&doc.getTextWidth(last+'…')>w)last=last.slice(0,-1);lines[cap-1]=last+'…';}doc.text(lines,x,y,{maxWidth:w});return Math.min(lines.length*lh,maxH);};
    const putMarked=(v,x,y,w,size=8,maxH=40)=>{
   const rows=principles(v);if(!rows.length)return 0;
-  const colGap=3,maxCols=2,baseGap=.65;
-  let fs=size,cols=1,actualW=w,lh=fs*.48+1.15;
-  const layout=(n,trialFs)=>{
-    const cw=(w-(n-1)*colGap)/n,lineH=trialFs*.48+1.15;
-    let col=0,used=0,items=[];
+  const colGap=3;let fs=size,chosen=null;
+  // Reflow all text into a two-column layout; never fail with an empty result.
+  const build=(trialFs)=>{
+    const cw=(w-colGap)/2,lineH=trialFs*.48+1.15,flat=[];
+    doc.setFont('helvetica','normal');doc.setFontSize(trialFs);
     for(const row of rows){
-      const indent=row.bullet?4:0,avail=Math.max(8,cw-indent);
-      doc.setFont('helvetica','normal');doc.setFontSize(trialFs);
-      const lines=doc.splitTextToSize(row.text,avail);
-      for(let li=0;li<lines.length;li++){
-        if(used+lineH>maxH+.01){col++;used=0;}
-        if(col>=n)return null;
-        items.push({text:lines[li],col,used,indent,avail,bullet:row.bullet&&li===0});
-        used+=lineH;
-      }
-      used+=baseGap;
+      const indent=row.bullet?4:0,avail=Math.max(8,cw-indent),lines=doc.splitTextToSize(row.text,avail);
+      lines.forEach((line,i)=>flat.push({text:line,indent:i===0?indent:0,bullet:row.bullet&&i===0}));
+      flat.push({gap:true});
     }
-    return {items,used,col,cw,lineH};
+    const capacity=Math.max(1,Math.floor(maxH/lineH));
+    // Balance line chunks between columns; blank separators are lightweight.
+    let cleanFlat=flat.filter(a=>!a.gap),split=Math.ceil(cleanFlat.length/2),cols=[cleanFlat.slice(0,split),cleanFlat.slice(split)];
+    if(cols.some(c=>c.length>capacity))return null;
+    return {cols,cw,lineH,trialFs,capacity};
   };
-  let result=layout(1,fs);
-  if(!result){cols=2;result=layout(cols,fs);}
-  // Shrink in small, uniform steps only if two columns still cannot fit.
-  while(!result&&fs>4.8){fs=Math.max(4.8,fs-.2);result=layout(cols,fs);}
-  if(!result){
-    // Last-resort safe fit: two columns at the minimum font, trimming only
-    // beyond the physical field capacity rather than drawing outside the box.
-    fs=4.8;cols=2;actualW=(w-colGap)/2;lh=fs*.48+1.15;
-    result=layout(cols,fs);
-  }
-  actualW=(w-(cols-1)*colGap)/cols;lh=fs*.48+1.15;
-  doc.setFont('helvetica','normal');doc.setFontSize(fs);doc.setTextColor(...C.white);
-  const items=result?.items||[];
-  for(const item of items){
-    const cx=x+item.col*(actualW+colGap),baseline=y+item.used+fs*.78;
-    if(item.bullet){doc.setFillColor(...C.white);doc.circle(cx+1.15,baseline-fs*.12,.65,'F');}
-    doc.text(String(item.text),cx+item.indent,baseline,{maxWidth:item.avail});
-  }
-  return Math.min(maxH,result?.used||0);
+  while(fs>=4.5&&!chosen){chosen=build(fs);if(!chosen)fs=Math.max(4.5,fs-.25);if(fs===4.5&&!chosen)break;}
+  if(!chosen){fs=4.5;doc.setFont('helvetica','normal');doc.setFontSize(fs);const cw=(w-colGap)/2,lineH=fs*.48+1.15,flat=[];for(const row of rows){let avail=Math.max(8,cw-(row.bullet?4:0));doc.setFontSize(fs);doc.splitTextToSize(row.text,avail).forEach((line,i)=>flat.push({text:line,indent:i===0&&row.bullet?4:0,bullet:row.bullet&&i===0}));}const cap=Math.max(1,Math.floor(maxH/lineH));chosen={cols:[flat.slice(0,cap),flat.slice(cap,cap*2)],cw,lineH,trialFs:fs};}
+  const {cols,cw,lineH,trialFs}=chosen;doc.setFont('helvetica','normal');doc.setFontSize(trialFs);doc.setTextColor(...C.white);
+  cols.forEach((col,ci)=>col.forEach((item,li)=>{const cx=x+ci*(cw+colGap),baseline=y+li*lineH+trialFs*.78;if(item.bullet){doc.setFillColor(...C.white);doc.circle(cx+1.15,baseline-trialFs*.12,.65,'F');}doc.text(String(item.text),cx+item.indent,baseline,{maxWidth:Math.max(8,cw-item.indent)});}));
+  return Math.min(maxH,Math.max(...cols.map(c=>c.length))*lineH);
 };
 const bulletList=(arr,x,y,w,size=8,maxH=50)=>putMarked(arr.map(i=>(i.bullet?'% ':'')+i.text).join('\n'),x,y,w,size,maxH);
   bg(1);
