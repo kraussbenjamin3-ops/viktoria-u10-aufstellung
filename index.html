@@ -645,8 +645,9 @@ async function vkInitialize(){
  }
  }catch(err){console.error('IndexedDB initialisieren',err);window.vkStorageStatus='error';alert('Der neue Speicher konnte nicht initialisiert werden. Die bisherigen Daten bleiben vorerst unangetastet.');}
  state.seasons=state.seasons||[];state.seasonPhases=state.seasonPhases||[];state.seasonActiveId=state.seasonActiveId||'default';state.weekPlans=state.weekPlans||{};
- // Beim Start ältere Sicherungen sicher entfernen: nur die 3 neuesten Backup-Einträge behalten.
- try{const backupDb=await vkOpenDB();await vkTrimBackups(backupDb);backupDb.close();}catch(err){console.warn('Backup-Bereinigung beim Start fehlgeschlagen',err);}
+ // Backup-Bereinigung im Hintergrund: App-Rendering darf niemals darauf warten.
+ // Nur die 3 neuesten Backups behalten; Fehler bei der Bereinigung blockieren die App nicht.
+ (async()=>{let backupDb;try{backupDb=await vkOpenDB();await vkTrimBackups(backupDb);}catch(err){console.warn('Backup-Bereinigung im Hintergrund fehlgeschlagen',err);}finally{backupDb?.close();}})();
  // Normalize the exercises AFTER loading the persisted IndexedDB state, not before.
  // This changes only formatting separators in the four text fields and saves the existing exercise objects.
  // Startup-Schutz/Formatierungsprüfung deaktiviert, um die App-Initialisierung zu entlasten.
